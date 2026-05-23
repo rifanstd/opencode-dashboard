@@ -138,3 +138,53 @@ export interface TimeSeriesData {
   reasoning: number
   cache: number
 }
+
+export type TimeRange = '7d' | '30d' | '90d' | 'all'
+
+export interface MetricCardData {
+  label: string
+  value: string | number
+  subLabel?: string
+  trend?: 'up' | 'down' | 'neutral'
+}
+
+export interface DonutSegment {
+  name: string
+  value: number
+  color: string
+}
+
+export interface DailyCostPoint {
+  date: string
+  cost: number
+}
+
+export interface ModelBreakdownItem {
+  label: string
+  input: number
+  output: number
+  reasoning: number
+  cache: number
+  totalTokens: number
+  totalCost: number
+}
+
+export interface ProjectBreakdownItem {
+  label: string
+  input: number
+  output: number
+  reasoning: number
+  cache: number
+  totalTokens: number
+}
+
+export interface RecentSessionRow {
+  id: string
+  title: string
+  model_id: string | null
+  total_tokens: number
+  computedCost: number
+  created_at: string
+}
+
+export type HeatmapData = number[][]

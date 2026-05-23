@@ -2,9 +2,22 @@ interface SummaryCardProps {
   label: string
   value: string | number
   subLabel?: string
+  trend?: 'up' | 'down' | 'neutral'
 }
 
-export default function SummaryCard({ label, value, subLabel }: SummaryCardProps) {
+const trendSymbols: Record<string, string> = {
+  up: '↑',
+  down: '↓',
+  neutral: '—',
+}
+
+const trendColors: Record<string, string> = {
+  up: 'var(--success, #22c55e)',
+  down: 'var(--danger, #ef4444)',
+  neutral: 'var(--text-muted)',
+}
+
+export default function SummaryCard({ label, value, subLabel, trend }: SummaryCardProps) {
   return (
     <div
       style={{
@@ -24,7 +37,12 @@ export default function SummaryCard({ label, value, subLabel }: SummaryCardProps
         {value}
       </div>
       {subLabel && (
-        <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{subLabel}</div>
+        <div style={{ fontSize: 12, color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: 4 }}>
+          {trend && trend !== 'neutral' && (
+            <span style={{ color: trendColors[trend], fontWeight: 700 }}>{trendSymbols[trend]}</span>
+          )}
+          <span>{subLabel}</span>
+        </div>
       )}
     </div>
   )
