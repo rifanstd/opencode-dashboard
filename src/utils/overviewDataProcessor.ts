@@ -1,7 +1,6 @@
 import type {
   Session,
   Message,
-  Part,
   ModelInfo,
   OverviewStats,
   TimeRange,
@@ -15,7 +14,7 @@ import type {
   TimeSeriesData,
 } from '../types/index.ts'
 import type { TokenUsageData } from '../utils/dataLoader.ts'
-import { calculateCost, formatCost } from './costCalculator.ts'
+import { calculateCost, formatCost, formatNumber } from './costCalculator.ts'
 import type { Pricing } from './costCalculator.ts'
 
 function toISODate(date: Date): string {
@@ -54,7 +53,7 @@ function countInDateRange<T extends { created_at: string }>(
   return count
 }
 
-function sumTokensInRange<T extends { created_at: string; input_tokens: number; output_tokens: number; reasoning_tokens: number; cache_tokens: number }>(
+function sumTokensInRangeExcludingReasoning<T extends { created_at: string; input_tokens: number; output_tokens: number; cache_tokens: number }>(
   items: T[],
   start: string,
   end: string
@@ -63,8 +62,22 @@ function sumTokensInRange<T extends { created_at: string; input_tokens: number; 
   for (const item of items) {
     const d = item.created_at.slice(0, 10)
     if (d >= start && d <= end) {
-      sum += item.input_tokens + item.output_tokens + item.reasoning_tokens + item.cache_tokens
+      sum += item.input_tokens + item.output_tokens + item.cache_tokens
     }
+  }
+  return sum
+}
+
+function sumTokenFieldInRange<T extends { created_at: string }>(
+  items: T[],
+  field: (item: T) => number,
+  start: string,
+  end: string
+): number {
+  let sum = 0
+  for (const item of items) {
+    const d = item.created_at.slice(0, 10)
+    if (d >= start && d <= end) sum += field(item)
   }
   return sum
 }
@@ -120,18 +133,25 @@ export function filterByTimeRange<T extends { date: string }>(
 
 export function computeKeyMetrics(
   sessions: Session[],
-  messages: Message[],
-  parts: Part[],
-  _models: ModelInfo[],
   overview: OverviewStats,
   tokenUsage: TokenUsageData,
-  pricingMap: Map<string, Pricing>
+  pricingMap: Map<string, Pricing>,
+  modelsCount: number,
+  providersCount: number
 ): MetricCardData[] {
   const today = getToday()
 
   // Totals
   const totalTokens =
-    tokenUsage.byDay.reduce((sum, d) => sum + d.input + d.output + d.reasoning + d.cache, 0)
+    tokenUsage.byDay.reduce((sum, d) => sum + d.input + d.output + d.cache, 0)
+
+  // Total input tokens from byDay (for Input Tokens card)
+  const totalInputTokens =
+    tokenUsage.byDay.reduce((sum, d) => sum + d.input, 0)
+
+  // Total cache tokens from byDay (for Cache card)
+  const totalCacheTokens =
+    tokenUsage.byDay.reduce((sum, d) => sum + d.cache, 0)
 
   // Total cost computed from sessions
   let totalCost = 0
@@ -159,94 +179,70 @@ export function computeKeyMetrics(
   const prev30End = addDays(today, -30)
 
   // Comparisons
-  const sessions7d = countInDateRange(sessions, last7Start, today)
-  const sessionsPrev7d = countInDateRange(sessions, prev7Start, prev7End)
-  const sessionsDiff = sessions7d - sessionsPrev7d
+  const sessions30d = countInDateRange(sessions, last30Start, today)
+  const sessionsPrev30d = countInDateRange(sessions, prev30Start, prev30End)
+  const sessions30dDiff = sessions30d - sessionsPrev30d
 
-  const tokens7d = sumTokensInRange(sessions, last7Start, today)
-  const tokensPrev7d = sumTokensInRange(sessions, prev7Start, prev7End)
+  const tokens7d = sumTokensInRangeExcludingReasoning(sessions, last7Start, today)
+  const tokensPrev7d = sumTokensInRangeExcludingReasoning(sessions, prev7Start, prev7End)
   const tokensPct = tokensPrev7d > 0 ? Math.round(((tokens7d - tokensPrev7d) / tokensPrev7d) * 100) : 0
+
+  const inputTokens7d = sumTokenFieldInRange(sessions, (s) => s.input_tokens, last7Start, today)
+  const inputTokensPrev7d = sumTokenFieldInRange(sessions, (s) => s.input_tokens, prev7Start, prev7End)
+  const inputTokensPct = inputTokensPrev7d > 0
+    ? Math.round(((inputTokens7d - inputTokensPrev7d) / inputTokensPrev7d) * 100)
+    : 0
+
+  const cacheTokens7d = sumTokenFieldInRange(sessions, (s) => s.cache_tokens, last7Start, today)
+  const cacheTokensPrev7d = sumTokenFieldInRange(sessions, (s) => s.cache_tokens, prev7Start, prev7End)
+  const cacheTokensPct = cacheTokensPrev7d > 0
+    ? Math.round(((cacheTokens7d - cacheTokensPrev7d) / cacheTokensPrev7d) * 100)
+    : 0
 
   const cost7d = computeCostInRange(sessions, pricingMap, last7Start, today)
   const costPrev7d = computeCostInRange(sessions, pricingMap, prev7Start, prev7End)
   const costPct = costPrev7d > 0 ? Math.round(((cost7d - costPrev7d) / costPrev7d) * 100) : 0
 
-  const messages7d = countInDateRange(messages, last7Start, today)
-  const messagesPrev7d = countInDateRange(messages, prev7Start, prev7End)
-  const messagesDiff = messages7d - messagesPrev7d
-
-  const sessions30d = countInDateRange(sessions, last30Start, today)
-  const sessionsPrev30d = countInDateRange(sessions, prev30Start, prev30End)
-  const sessions30dDiff = sessions30d - sessionsPrev30d
-
-  // Tool calls
-  const toolMetrics = computeToolCallMetrics(parts)
-  const toolDiff = toolMetrics.last7Days - (() => {
-    let count = 0
-    for (const p of parts) {
-      if (p.type === 'tool') {
-        const d = p.created_at.slice(0, 10)
-        if (d >= prev7Start && d <= prev7End) count++
-      }
-    }
-    return count
-  })()
-
-  const avgTokensPerSession =
-    overview.totalSessions > 0 ? Math.round(totalTokens / overview.totalSessions) : 0
-
   const cards: MetricCardData[] = [
     {
       label: 'Total Sessions',
-      value: overview.totalSessions.toLocaleString(),
+      value: formatNumber(overview.totalSessions),
       subLabel: sessions30dDiff !== 0 ? `${sessions30dDiff > 0 ? '+' : ''}${sessions30dDiff} vs last 30 days` : undefined,
       trend: sessions30dDiff > 0 ? 'up' : sessions30dDiff < 0 ? 'down' : 'neutral',
     },
     {
       label: 'Total Tokens',
-      value: totalTokens.toLocaleString(),
+      value: formatNumber(totalTokens),
       subLabel: tokensPct !== 0 ? `${tokensPct > 0 ? '+' : ''}${tokensPct}% vs last 7 days` : undefined,
       trend: tokensPct > 0 ? 'up' : tokensPct < 0 ? 'down' : 'neutral',
     },
     {
+      label: 'Input Tokens',
+      value: formatNumber(totalInputTokens),
+      subLabel: inputTokensPct !== 0 ? `${inputTokensPct > 0 ? '+' : ''}${inputTokensPct}% vs last 7 days` : undefined,
+      trend: inputTokensPct > 0 ? 'up' : inputTokensPct < 0 ? 'down' : 'neutral',
+    },
+    {
+      label: 'Cache',
+      value: formatNumber(totalCacheTokens),
+      subLabel: cacheTokensPct !== 0 ? `${cacheTokensPct > 0 ? '+' : ''}${cacheTokensPct}% vs last 7 days` : undefined,
+      trend: cacheTokensPct > 0 ? 'up' : cacheTokensPct < 0 ? 'down' : 'neutral',
+    },
+    {
+      label: 'Models',
+      value: formatNumber(modelsCount),
+      subLabel: 'Available models from all providers',
+    },
+    {
+      label: 'Providers',
+      value: formatNumber(providersCount),
+      subLabel: 'Connected providers',
+    },
+    {
       label: 'Estimated Cost',
-      value: formatCost(totalCost),
+      value: totalCost < 1000 ? formatCost(totalCost) : '$' + formatNumber(totalCost),
       subLabel: costPct !== 0 ? `${costPct > 0 ? '+' : ''}${costPct}% vs last 7 days` : undefined,
       trend: costPct > 0 ? 'up' : costPct < 0 ? 'down' : 'neutral',
-    },
-    {
-      label: 'Most Used Model',
-      value: overview.mostUsedModel || '—',
-    },
-    {
-      label: 'Active Projects',
-      value: overview.activeProjects,
-    },
-    {
-      label: 'Total Messages',
-      value: messages.length.toLocaleString(),
-      subLabel: messagesDiff !== 0 ? `${messagesDiff > 0 ? '+' : ''}${messagesDiff} vs last 7 days` : undefined,
-      trend: messagesDiff > 0 ? 'up' : messagesDiff < 0 ? 'down' : 'neutral',
-    },
-    {
-      label: 'Sessions in Last 7 Days',
-      value: sessions7d.toLocaleString(),
-      subLabel: sessionsDiff !== 0 ? `${sessionsDiff > 0 ? '+' : ''}${sessionsDiff} vs previous 7 days` : undefined,
-      trend: sessionsDiff > 0 ? 'up' : sessionsDiff < 0 ? 'down' : 'neutral',
-    },
-    {
-      label: 'Sessions in Last 30 Days',
-      value: sessions30d.toLocaleString(),
-    },
-    {
-      label: 'Avg Tokens per Session',
-      value: avgTokensPerSession.toLocaleString(),
-    },
-    {
-      label: 'Tool Calls',
-      value: toolMetrics.total.toLocaleString(),
-      subLabel: toolDiff !== 0 ? `${toolDiff > 0 ? '+' : ''}${toolDiff} vs last 7 days` : undefined,
-      trend: toolDiff > 0 ? 'up' : toolDiff < 0 ? 'down' : 'neutral',
     },
   ]
 
@@ -254,27 +250,22 @@ export function computeKeyMetrics(
 }
 
 export function computeTokenComposition(tokenUsage: TokenUsageData): DonutSegment[] {
-  const total =
-    tokenUsage.byDay.reduce((sum, d) => sum + d.input + d.output + d.reasoning + d.cache, 0)
+  const input = tokenUsage.byDay.reduce((sum, d) => sum + d.input, 0)
+  const output = tokenUsage.byDay.reduce((sum, d) => sum + d.output, 0)
+  const cache = tokenUsage.byDay.reduce((sum, d) => sum + d.cache, 0)
+  const total = input + output + cache
 
   if (total === 0) {
     return [
       { name: 'Input', value: 0, color: 'var(--chart-1)' },
       { name: 'Output', value: 0, color: 'var(--chart-2)' },
-      { name: 'Reasoning', value: 0, color: 'var(--chart-3)' },
       { name: 'Cache', value: 0, color: 'var(--chart-4)' },
     ]
   }
 
-  const input = tokenUsage.byDay.reduce((sum, d) => sum + d.input, 0)
-  const output = tokenUsage.byDay.reduce((sum, d) => sum + d.output, 0)
-  const reasoning = tokenUsage.byDay.reduce((sum, d) => sum + d.reasoning, 0)
-  const cache = tokenUsage.byDay.reduce((sum, d) => sum + d.cache, 0)
-
   return [
     { name: 'Input', value: input, color: 'var(--chart-1)' },
     { name: 'Output', value: output, color: 'var(--chart-2)' },
-    { name: 'Reasoning', value: reasoning, color: 'var(--chart-3)' },
     { name: 'Cache', value: cache, color: 'var(--chart-4)' },
   ]
 }
@@ -424,25 +415,6 @@ export function computeActivityHeatmap(messages: Message[]): HeatmapData {
   }
 
   return grid
-}
-
-export function computeToolCallMetrics(parts: Part[]): { total: number; last7Days: number } {
-  const today = getToday()
-  const last7Start = addDays(today, -6)
-  let total = 0
-  let last7Days = 0
-
-  for (const p of parts) {
-    if (p.type === 'tool') {
-      total++
-      const d = p.created_at.slice(0, 10)
-      if (d >= last7Start && d <= today) {
-        last7Days++
-      }
-    }
-  }
-
-  return { total, last7Days }
 }
 
 export { buildPricingMap }

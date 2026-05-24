@@ -29,16 +29,20 @@ function detectOpencodePaths() {
         path.join(home, '.local', 'share', 'opencode'),
         path.join(home, 'AppData', 'Local', 'opencode'),
         path.join(home, '.opencode'),
+        path.join(home, 'AppData', 'Local', 'OpenCode'),
+        path.join(home, 'opencode'),
       ],
       cache: [
         path.join(home, '.cache', 'opencode'),
         path.join(home, 'AppData', 'Local', 'opencode', 'Cache'),
         path.join(home, '.opencode', 'cache'),
+        path.join(home, 'AppData', 'Local', 'OpenCode', 'Cache'),
       ],
       config: [
         path.join(home, '.config', 'opencode'),
         path.join(home, 'AppData', 'Roaming', 'opencode'),
         path.join(home, '.opencode'),
+        path.join(home, 'AppData', 'Roaming', 'OpenCode'),
       ],
     }
 
@@ -395,19 +399,77 @@ function exportJsonFiles(paths) {
   // Providers from auth.json
   if (paths.local) {
     const authPath = path.join(paths.local, 'auth.json')
+    console.log(`  Attempting auth.json from local: ${authPath}`)
     const authJson = readJsonSafe(authPath)
+    if (authJson) {
+      console.log(`  auth.json found in local (${Array.isArray(authJson) ? authJson.length : Object.keys(authJson).length} entries)`)
+    } else {
+      console.log(`  auth.json not found or unreadable in local`)
+    }
     if (authJson && typeof authJson === 'object') {
-      for (const [key, value] of Object.entries(authJson)) {
-        if (value && typeof value === 'object') {
-          providers.push({
-            id: key,
-            name: value.name ?? key,
-            apiKey: value.apiKey ?? value.api_key ?? null,
-            baseUrl: value.baseUrl ?? value.base_url ?? null,
-            configured: !!(value.apiKey || value.api_key),
-          })
+      if (Array.isArray(authJson)) {
+        console.log(`  auth.json is an array (${authJson.length} entries), iterating as providers`)
+        authJson.forEach((value, index) => {
+          if (value && typeof value === 'object') {
+            const id = value.id ?? value.name ?? `provider-${index}`
+            providers.push({
+              id,
+              name: value.name ?? id,
+              apiKey: value.apiKey ?? value.api_key ?? value.key ?? value.token ?? value.secret ?? value.apiToken ?? null,
+              baseUrl: value.baseUrl ?? value.base_url ?? null,
+              configured: !!(value.apiKey || value.api_key || value.key || value.token || value.secret || value.apiToken),
+            })
+          }
+        })
+      } else {
+        for (const [key, value] of Object.entries(authJson)) {
+          if (value && typeof value === 'object') {
+            providers.push({
+              id: key,
+              name: value.name ?? key,
+              apiKey: value.apiKey ?? value.api_key ?? value.key ?? value.token ?? value.secret ?? value.apiToken ?? null,
+              baseUrl: value.baseUrl ?? value.base_url ?? null,
+              configured: !!(value.apiKey || value.api_key || value.key || value.token || value.secret || value.apiToken),
+            })
+          }
         }
       }
+    }
+  }
+
+  // Providers from auth.json in paths.config (fallback)
+  if (paths.config) {
+    const configAuthPath = path.join(paths.config, 'auth.json')
+    const localAuthPath = paths.local ? path.join(paths.local, 'auth.json') : null
+    if (configAuthPath !== localAuthPath) {
+      console.log(`  Attempting auth.json from config: ${configAuthPath}`)
+      const configAuthJson = readJsonSafe(configAuthPath)
+      if (configAuthJson) {
+        console.log(`  auth.json found in config (${Array.isArray(configAuthJson) ? configAuthJson.length : Object.keys(configAuthJson).length} entries)`)
+        const existingIds = new Set(providers.map(p => p.id))
+        const entries = Array.isArray(configAuthJson)
+          ? configAuthJson.map((value, index) => [value.id ?? value.name ?? `provider-${index}`, value])
+          : Object.entries(configAuthJson)
+        for (const [key, value] of entries) {
+          if (existingIds.has(key)) {
+            console.log(`  Provider "${key}" from config skipped (already in local)`)
+            continue
+          }
+          if (value && typeof value === 'object') {
+            providers.push({
+              id: key,
+              name: value.name ?? key,
+              apiKey: value.apiKey ?? value.api_key ?? value.key ?? value.token ?? value.secret ?? value.apiToken ?? null,
+              baseUrl: value.baseUrl ?? value.base_url ?? null,
+              configured: !!(value.apiKey || value.api_key || value.key || value.token || value.secret || value.apiToken),
+            })
+          }
+        }
+      } else {
+        console.log(`  auth.json not found or unreadable in config`)
+      }
+    } else {
+      console.log(`  config auth.json path same as local, skipping duplicate read`)
     }
   }
 

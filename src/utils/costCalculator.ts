@@ -23,6 +23,25 @@ export function formatCost(value: number): string {
   return `$${value.toFixed(2)}`
 }
 
+/**
+ * Formats a number with K/M suffix for compact display.
+ * - < 1000: standard locale formatting (e.g., "999")
+ * - >= 1000 and < 1000000: X.XK with trailing ".0" stripped (e.g., 1500 → "1.5K", 1000 → "1K")
+ * - >= 1000000: X.XM with trailing ".0" stripped (e.g., 2500000 → "2.5M", 2000000 → "2M")
+ */
+export function formatNumber(value: number): string {
+  if (!Number.isFinite(value)) return '0'
+  if (value < 1000) return Math.round(value).toLocaleString()
+  if (value < 1000000) {
+    const k = value / 1000
+    const formatted = k.toFixed(1)
+    return formatted.endsWith('.0') ? formatted.slice(0, -2) + 'K' : formatted + 'K'
+  }
+  const m = value / 1000000
+  const formatted = m.toFixed(1)
+  return formatted.endsWith('.0') ? formatted.slice(0, -2) + 'M' : formatted + 'M'
+}
+
 export function loadPricing(modelsJson: unknown): Map<string, Pricing> {
   const map = new Map<string, Pricing>()
   if (!modelsJson || typeof modelsJson !== 'object') return map

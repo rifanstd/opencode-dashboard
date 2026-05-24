@@ -19,7 +19,6 @@ interface TopModelsChartProps {
 const colors = {
   input: 'var(--chart-1)',
   output: 'var(--chart-2)',
-  reasoning: 'var(--chart-3)',
   cache: 'var(--chart-4)',
 }
 
@@ -90,7 +89,6 @@ export default function TopModelsChart({ data, sortBy, onSortChange }: TopModels
             <Legend />
             <Bar dataKey="input" stackId="a" fill={colors.input} />
             <Bar dataKey="output" stackId="a" fill={colors.output} />
-            <Bar dataKey="reasoning" stackId="a" fill={colors.reasoning} />
             <Bar dataKey="cache" stackId="a" fill={colors.cache} />
           </BarChart>
         </ResponsiveContainer>

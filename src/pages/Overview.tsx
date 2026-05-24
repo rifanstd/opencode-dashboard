@@ -4,8 +4,8 @@ import {
   loadTokenUsage,
   loadSessions,
   loadMessages,
-  loadParts,
   loadModels,
+  loadProviders,
 } from '../utils/dataLoader.ts'
 import {
   buildPricingMap,
@@ -27,7 +27,7 @@ import TopModelsChart from '../components/TopModelsChart.tsx'
 import ProjectActivityChart from '../components/ProjectActivityChart.tsx'
 import ActivityHeatmap from '../components/ActivityHeatmap.tsx'
 import RecentSessionsList from '../components/RecentSessionsList.tsx'
-import type { OverviewStats, TimeRange, Session, Message, Part, ModelInfo } from '../types/index.ts'
+import type { OverviewStats, TimeRange, Session, Message, ModelInfo, ProviderInfo } from '../types/index.ts'
 import type { TokenUsageData } from '../utils/dataLoader.ts'
 
 function useViewportWidth(): number {
@@ -65,8 +65,8 @@ export default function Overview() {
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
   const [messages, setMessages] = useState<Message[]>([])
-  const [parts, setParts] = useState<Part[]>([])
   const [models, setModels] = useState<ModelInfo[]>([])
+  const [providers, setProviders] = useState<ProviderInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [activityRange, setActivityRange] = useState<TimeRange>('30d')
@@ -79,13 +79,13 @@ export default function Overview() {
       try {
         setLoading(true)
         setError(null)
-        const [ov, tu, ses, msg, prt, mod] = await Promise.all([
+        const [ov, tu, ses, msg, mod, prov] = await Promise.all([
           loadOverviewStats(),
           loadTokenUsage(),
           loadSessions(),
           loadMessages(),
-          loadParts(),
           loadModels(),
+          loadProviders(),
         ])
 
         if (!isValidOverview(ov)) {
@@ -99,8 +99,8 @@ export default function Overview() {
         setTokenUsage(tu)
         setSessions(Array.isArray(ses) ? ses : [])
         setMessages(Array.isArray(msg) ? msg : [])
-        setParts(Array.isArray(prt) ? prt : [])
         setModels(Array.isArray(mod) ? mod : [])
+        setProviders(Array.isArray(prov) ? prov : [])
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
       } finally {
@@ -113,10 +113,13 @@ export default function Overview() {
 
   const pricingMap = useMemo(() => buildPricingMap(models), [models])
 
+  const modelsCount = models.length
+  const providersCount = providers.filter((p) => p.configured).length
+
   const metrics = useMemo(() => {
     if (!overview || !tokenUsage) return []
-    return computeKeyMetrics(sessions, messages, parts, models, overview, tokenUsage, pricingMap)
-  }, [sessions, messages, parts, models, overview, tokenUsage, pricingMap])
+    return computeKeyMetrics(sessions, overview, tokenUsage, pricingMap, modelsCount, providersCount)
+  }, [sessions, overview, tokenUsage, pricingMap, modelsCount, providersCount])
 
   const tokenComposition = useMemo(() => {
     if (!tokenUsage) return []
