@@ -185,8 +185,8 @@ async function exportDatabase(dbPath) {
       input_tokens: s.tokens_input ?? 0,
       output_tokens: s.tokens_output ?? 0,
       reasoning_tokens: s.tokens_reasoning ?? 0,
-      cache_tokens: (s.tokens_cache_read ?? 0) + (s.tokens_cache_write ?? 0),
-      total_tokens: (s.tokens_input ?? 0) + (s.tokens_output ?? 0) + (s.tokens_reasoning ?? 0) + (s.tokens_cache_read ?? 0) + (s.tokens_cache_write ?? 0),
+      cache_tokens: (s.tokens_cache_read ?? 0),
+      total_tokens: (s.tokens_input ?? 0) + (s.tokens_output ?? 0) + (s.tokens_reasoning ?? 0) + (s.tokens_cache_read ?? 0),
       cost: s.cost ?? null,
     }
   })
@@ -223,7 +223,7 @@ async function exportDatabase(dbPath) {
       input_tokens: tokens.input ?? 0,
       output_tokens: tokens.output ?? 0,
       reasoning_tokens: tokens.reasoning ?? 0,
-      cache_tokens: (cache.read ?? 0) + (cache.write ?? 0),
+      cache_tokens: (cache.read ?? 0),
     }
   })
 
@@ -473,23 +473,39 @@ function exportJsonFiles(paths) {
     }
   }
 
-  // Models from models.json
+  // Models from models.json (nested provider → models structure)
   if (paths.cache) {
     const modelsPath = path.join(paths.cache, 'models.json')
     const modelsJson = readJsonSafe(modelsPath)
     if (modelsJson && typeof modelsJson === 'object') {
-      for (const [key, value] of Object.entries(modelsJson)) {
-        if (value && typeof value === 'object') {
+      for (const [providerId, providerData] of Object.entries(modelsJson)) {
+        // providerData is the provider container: { name, models: { ... } }
+        if (!providerData || typeof providerData !== 'object') continue
+
+        const providerModels = providerData.models
+        if (!providerModels || typeof providerModels !== 'object') continue
+
+        for (const [modelId, modelData] of Object.entries(providerModels)) {
+          if (!modelData || typeof modelData !== 'object') continue
+
+          // Pricing from modelData.cost.{input,output,cache_read} (per-1M-tokens)
+          // Convert to per-token by dividing by 1_000_000
+          const cost = modelData.cost
+          const rawInputPrice = Number(cost?.input ?? modelData.input_price ?? modelData.inputPrice ?? 0)
+          const rawOutputPrice = Number(cost?.output ?? modelData.output_price ?? modelData.outputPrice ?? 0)
+          const rawCacheReadPrice = Number(cost?.cache_read ?? modelData.cache_price ?? 0)
+          const rawReasoningPrice = modelData.reasoning_price != null ? Number(modelData.reasoning_price) : undefined
+
           models.push({
-            id: key,
-            name: value.name ?? key,
-            provider: value.provider ?? '—',
-            capabilities: Array.isArray(value.capabilities) ? value.capabilities : [],
-            input_price: Number(value.input_price ?? value.inputPrice ?? 0),
-            output_price: Number(value.output_price ?? value.outputPrice ?? 0),
-            reasoning_price: value.reasoning_price != null ? Number(value.reasoning_price) : undefined,
-            cache_price: value.cache_price != null ? Number(value.cache_price) : undefined,
-            context_window: Number(value.context_window ?? value.contextWindow ?? 0),
+            id: modelId,
+            name: modelData.name ?? modelId,
+            provider: providerId,
+            capabilities: Array.isArray(modelData.capabilities) ? modelData.capabilities : [],
+            input_price: rawInputPrice / 1_000_000,
+            output_price: rawOutputPrice / 1_000_000,
+            reasoning_price: rawReasoningPrice != null ? rawReasoningPrice / 1_000_000 : undefined,
+            cache_price: rawCacheReadPrice / 1_000_000,
+            context_window: Number(modelData.context_window ?? modelData.contextWindow ?? 0),
           })
         }
       }

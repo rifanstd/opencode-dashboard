@@ -40,74 +40,6 @@ function getDateRange(range: TimeRange): { start: string; end: string } {
   return { start: addDays(end, -days), end }
 }
 
-function countInDateRange<T extends { created_at: string }>(
-  items: T[],
-  start: string,
-  end: string
-): number {
-  let count = 0
-  for (const item of items) {
-    const d = item.created_at.slice(0, 10)
-    if (d >= start && d <= end) count++
-  }
-  return count
-}
-
-function sumTokensInRangeExcludingReasoning<T extends { created_at: string; input_tokens: number; output_tokens: number; cache_tokens: number }>(
-  items: T[],
-  start: string,
-  end: string
-): number {
-  let sum = 0
-  for (const item of items) {
-    const d = item.created_at.slice(0, 10)
-    if (d >= start && d <= end) {
-      sum += item.input_tokens + item.output_tokens + item.cache_tokens
-    }
-  }
-  return sum
-}
-
-function sumTokenFieldInRange<T extends { created_at: string }>(
-  items: T[],
-  field: (item: T) => number,
-  start: string,
-  end: string
-): number {
-  let sum = 0
-  for (const item of items) {
-    const d = item.created_at.slice(0, 10)
-    if (d >= start && d <= end) sum += field(item)
-  }
-  return sum
-}
-
-function computeCostInRange(
-  sessions: Session[],
-  pricingMap: Map<string, Pricing>,
-  start: string,
-  end: string
-): number {
-  let total = 0
-  for (const s of sessions) {
-    const d = s.created_at.slice(0, 10)
-    if (d < start || d > end) continue
-    if (s.model_id && pricingMap.has(s.model_id)) {
-      const pricing = pricingMap.get(s.model_id)!
-      total += calculateCost(
-        {
-          input: s.input_tokens,
-          output: s.output_tokens,
-          reasoning: s.reasoning_tokens,
-          cache: s.cache_tokens,
-        },
-        pricing
-      )
-    }
-  }
-  return total
-}
-
 function buildPricingMap(models: ModelInfo[]): Map<string, Pricing> {
   const map = new Map<string, Pricing>()
   for (const m of models) {
@@ -139,7 +71,6 @@ export function computeKeyMetrics(
   modelsCount: number,
   providersCount: number
 ): MetricCardData[] {
-  const today = getToday()
 
   // Totals
   const totalTokens =
@@ -149,9 +80,16 @@ export function computeKeyMetrics(
   const totalInputTokens =
     tokenUsage.byDay.reduce((sum, d) => sum + d.input, 0)
 
+  // Total output tokens from byDay (for Output Tokens card)
+  const totalOutputTokens =
+    tokenUsage.byDay.reduce((sum, d) => sum + d.output, 0)
+
   // Total cache tokens from byDay (for Cache card)
   const totalCacheTokens =
     tokenUsage.byDay.reduce((sum, d) => sum + d.cache, 0)
+
+  // Cache miss = non-cached input tokens (additive model: input and cache are separate columns)
+  const totalCacheMissTokens = totalInputTokens
 
   // Total cost computed from sessions
   let totalCost = 0
@@ -170,68 +108,41 @@ export function computeKeyMetrics(
     }
   }
 
-  // Period windows
-  const last7Start = addDays(today, -6)
-  const prev7Start = addDays(today, -13)
-  const prev7End = addDays(today, -7)
-  const last30Start = addDays(today, -29)
-  const prev30Start = addDays(today, -59)
-  const prev30End = addDays(today, -30)
-
-  // Comparisons
-  const sessions30d = countInDateRange(sessions, last30Start, today)
-  const sessionsPrev30d = countInDateRange(sessions, prev30Start, prev30End)
-  const sessions30dDiff = sessions30d - sessionsPrev30d
-
-  const tokens7d = sumTokensInRangeExcludingReasoning(sessions, last7Start, today)
-  const tokensPrev7d = sumTokensInRangeExcludingReasoning(sessions, prev7Start, prev7End)
-  const tokensPct = tokensPrev7d > 0 ? Math.round(((tokens7d - tokensPrev7d) / tokensPrev7d) * 100) : 0
-
-  const inputTokens7d = sumTokenFieldInRange(sessions, (s) => s.input_tokens, last7Start, today)
-  const inputTokensPrev7d = sumTokenFieldInRange(sessions, (s) => s.input_tokens, prev7Start, prev7End)
-  const inputTokensPct = inputTokensPrev7d > 0
-    ? Math.round(((inputTokens7d - inputTokensPrev7d) / inputTokensPrev7d) * 100)
-    : 0
-
-  const cacheTokens7d = sumTokenFieldInRange(sessions, (s) => s.cache_tokens, last7Start, today)
-  const cacheTokensPrev7d = sumTokenFieldInRange(sessions, (s) => s.cache_tokens, prev7Start, prev7End)
-  const cacheTokensPct = cacheTokensPrev7d > 0
-    ? Math.round(((cacheTokens7d - cacheTokensPrev7d) / cacheTokensPrev7d) * 100)
-    : 0
-
-  const cost7d = computeCostInRange(sessions, pricingMap, last7Start, today)
-  const costPrev7d = computeCostInRange(sessions, pricingMap, prev7Start, prev7End)
-  const costPct = costPrev7d > 0 ? Math.round(((cost7d - costPrev7d) / costPrev7d) * 100) : 0
-
   const cards: MetricCardData[] = [
     {
       label: 'Total Sessions',
       value: formatNumber(overview.totalSessions),
-      subLabel: sessions30dDiff !== 0 ? `${sessions30dDiff > 0 ? '+' : ''}${sessions30dDiff} vs last 30 days` : undefined,
-      trend: sessions30dDiff > 0 ? 'up' : sessions30dDiff < 0 ? 'down' : 'neutral',
+      subLabel: 'Global sessions',
     },
     {
       label: 'Total Tokens',
       value: formatNumber(totalTokens),
-      subLabel: tokensPct !== 0 ? `${tokensPct > 0 ? '+' : ''}${tokensPct}% vs last 7 days` : undefined,
-      trend: tokensPct > 0 ? 'up' : tokensPct < 0 ? 'down' : 'neutral',
+      subLabel: 'All tokens across sessions',
     },
     {
       label: 'Input Tokens',
-      value: formatNumber(totalInputTokens),
-      subLabel: inputTokensPct !== 0 ? `${inputTokensPct > 0 ? '+' : ''}${inputTokensPct}% vs last 7 days` : undefined,
-      trend: inputTokensPct > 0 ? 'up' : inputTokensPct < 0 ? 'down' : 'neutral',
+      value: formatNumber(totalInputTokens + totalCacheTokens),
+      subLabel: 'Prompt + cache tokens',
     },
     {
-      label: 'Cache',
+      label: 'Output Tokens',
+      value: formatNumber(totalOutputTokens),
+      subLabel: 'Generated by models',
+    },
+    {
+      label: 'Cache Read',
       value: formatNumber(totalCacheTokens),
-      subLabel: cacheTokensPct !== 0 ? `${cacheTokensPct > 0 ? '+' : ''}${cacheTokensPct}% vs last 7 days` : undefined,
-      trend: cacheTokensPct > 0 ? 'up' : cacheTokensPct < 0 ? 'down' : 'neutral',
+      subLabel: 'Served from prompt cache',
+    },
+    {
+      label: 'Cache Miss',
+      value: formatNumber(totalCacheMissTokens),
+      subLabel: 'Sent to models (not cached)',
     },
     {
       label: 'Models',
       value: formatNumber(modelsCount),
-      subLabel: 'Available models from all providers',
+      subLabel: 'From configured providers',
     },
     {
       label: 'Providers',
@@ -241,8 +152,7 @@ export function computeKeyMetrics(
     {
       label: 'Estimated Cost',
       value: totalCost < 1000 ? formatCost(totalCost) : '$' + formatNumber(totalCost),
-      subLabel: costPct !== 0 ? `${costPct > 0 ? '+' : ''}${costPct}% vs last 7 days` : undefined,
-      trend: costPct > 0 ? 'up' : costPct < 0 ? 'down' : 'neutral',
+      subLabel: 'Based on token pricing',
     },
   ]
 
@@ -253,20 +163,21 @@ export function computeTokenComposition(tokenUsage: TokenUsageData): DonutSegmen
   const input = tokenUsage.byDay.reduce((sum, d) => sum + d.input, 0)
   const output = tokenUsage.byDay.reduce((sum, d) => sum + d.output, 0)
   const cache = tokenUsage.byDay.reduce((sum, d) => sum + d.cache, 0)
-  const total = input + output + cache
+  const cacheMiss = input
+  const total = input + cache + output
 
   if (total === 0) {
     return [
-      { name: 'Input', value: 0, color: 'var(--chart-1)' },
+      { name: 'Cache Miss', value: 0, color: 'var(--chart-1)' },
+      { name: 'Cache Read', value: 0, color: 'var(--chart-4)' },
       { name: 'Output', value: 0, color: 'var(--chart-2)' },
-      { name: 'Cache', value: 0, color: 'var(--chart-4)' },
     ]
   }
 
   return [
-    { name: 'Input', value: input, color: 'var(--chart-1)' },
+    { name: 'Cache Miss', value: cacheMiss, color: 'var(--chart-1)' },
+    { name: 'Cache Read', value: cache, color: 'var(--chart-4)' },
     { name: 'Output', value: output, color: 'var(--chart-2)' },
-    { name: 'Cache', value: cache, color: 'var(--chart-4)' },
   ]
 }
 

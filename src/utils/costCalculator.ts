@@ -9,14 +9,17 @@ export function calculateCost(
   tokens: { input: number; output: number; reasoning?: number; cache?: number },
   pricing: Pricing
 ): number {
+  const cacheReadTokens = tokens.cache ?? 0
   const inputCost = tokens.input * (pricing.input ?? 0)
   const outputCost = tokens.output * (pricing.output ?? 0)
   const reasoningCost = (tokens.reasoning ?? 0) * (pricing.reasoning ?? 0)
-  const cacheCost = (tokens.cache ?? 0) * (pricing.cache ?? 0)
+  const cacheCost = cacheReadTokens * (pricing.cache ?? 0)
   return inputCost + outputCost + reasoningCost + cacheCost
 }
 
 export function formatCost(value: number): string {
+  if (!Number.isFinite(value)) return '$0.00'
+  if (value === 0) return '$0.00'
   if (value < 1) {
     return `$${value.toFixed(4)}`
   }

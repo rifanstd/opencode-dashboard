@@ -113,7 +113,16 @@ export default function Overview() {
 
   const pricingMap = useMemo(() => buildPricingMap(models), [models])
 
-  const modelsCount = models.length
+  const configuredProviderIds = useMemo(
+    () => new Set(providers.filter((p) => p.configured).map((p) => p.id)),
+    [providers],
+  )
+
+  const modelsCount = useMemo(
+    () => models.filter((m) => configuredProviderIds.has(m.provider)).length,
+    [models, configuredProviderIds],
+  )
+
   const providersCount = providers.filter((p) => p.configured).length
 
   const metrics = useMemo(() => {
