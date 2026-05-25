@@ -6,7 +6,6 @@ import {
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
-  Cell,
 } from 'recharts'
 import type { ModelUsageBarItem } from '../types/index.ts'
 import { formatNumber } from '../utils/costCalculator.ts'
@@ -15,70 +14,78 @@ interface ModelUsageChartProps {
   data: ModelUsageBarItem[]
 }
 
-const modelColors = [
-  'var(--chart-1)',
-  'var(--chart-2)',
-  'var(--chart-3)',
-  'var(--chart-4)',
-]
+function CustomTooltip({ active, payload, label }: Record<string, unknown>) {
+  if (!active || !payload || !Array.isArray(payload) || payload.length === 0) return null
+  return (
+    <div
+      style={{
+        background: '#1c2128',
+        border: '1px solid #30363d',
+        borderRadius: 6,
+        padding: '8px 12px',
+        fontFamily: 'var(--mono)',
+        fontSize: 12,
+        color: 'var(--text-primary)',
+      }}
+    >
+      <div style={{ color: 'var(--text-secondary)', marginBottom: 2 }}>{String(label ?? '')}</div>
+      <div style={{ color: 'var(--accent)' }}>
+        {formatNumber(typeof payload[0]?.value === 'number' ? (payload[0] as Record<string, unknown>).value as number : 0)} tokens
+      </div>
+    </div>
+  )
+}
 
 export default function ModelUsageChart({ data }: ModelUsageChartProps) {
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
-        <h3 style={{ fontSize: 16, margin: 0, color: 'var(--text-primary)' }}>Model Usage</h3>
+        <span
+          style={{
+            fontFamily: 'var(--sans)',
+            fontSize: 14,
+            fontWeight: 500,
+            color: 'var(--text-secondary)',
+          }}
+        >
+          Model Usage
+        </span>
       </div>
-      <div style={{ width: '100%', height: 320 }} aria-label="Model usage vertical bar chart">
+      <div style={{ width: '100%', height: 300 }} aria-label="Model usage bar chart">
         {data.length === 0 ? (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--text-muted)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: '100%',
+              color: 'var(--text-muted)',
+              fontFamily: 'var(--sans)',
+              fontSize: 13,
+            }}
+          >
             No data available
           </div>
         ) : (
           <ResponsiveContainer>
             <BarChart data={data} margin={{ left: 0, right: 8, top: 5, bottom: 5 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-              <XAxis
-                dataKey="label"
-                stroke="var(--text-secondary)"
-                tick={{ fontSize: 11 }}
+              <CartesianGrid stroke="#21262d" strokeWidth={0.5} vertical={false} />
+              <XAxis dataKey="label" hide />
+              <YAxis hide />
+              <Tooltip content={CustomTooltip} />
+              <Bar
+                dataKey="totalTokens"
+                fill="var(--accent)"
+                fillOpacity={0.85}
+                radius={[2, 2, 0, 0]}
+                maxBarSize={40}
+                animationDuration={600}
+                animationEasing="ease-out"
               />
-              <YAxis
-                stroke="var(--text-secondary)"
-                tick={{ fontSize: 11 }}
-                tickFormatter={(v: number) => formatNumber(v)}
-              />
-              <Tooltip
-                contentStyle={{
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  color: 'var(--text-primary)',
-                }}
-                formatter={(value) => [
-                  formatNumber(typeof value === 'number' ? value : 0),
-                  'Total Tokens',
-                ]}
-                labelFormatter={(label) => String(label)}
-              />
-              <Bar dataKey="totalTokens" radius={[4, 4, 0, 0]}>
-                {data.map((item, index) => (
-                  <Cell key={item.label} fill={modelColors[index % modelColors.length]} />
-                ))}
-              </Bar>
             </BarChart>
           </ResponsiveContainer>
         )}
       </div>
-      {data.length > 0 && (
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 16, marginTop: 8, flexWrap: 'wrap' }}>
-          {data.map((item, index) => (
-            <div key={item.label} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-              <div style={{ width: 12, height: 12, borderRadius: 2, background: modelColors[index % modelColors.length] }} />
-              <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{item.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   )
 }

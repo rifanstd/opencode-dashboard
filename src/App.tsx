@@ -1,19 +1,48 @@
 import { useEffect, useState, useCallback } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom'
+import { AnimatePresence, motion } from 'motion/react'
 import { useAppStore } from './stores/appStore.ts'
 import { handleSync } from './utils/sync.ts'
 import Layout from './components/Layout.tsx'
 import LoadingOverlay from './components/LoadingOverlay.tsx'
 import ErrorBoundary from './components/ErrorBoundary.tsx'
 import Overview from './pages/Overview.tsx'
-import TokenUsage from './pages/TokenUsage.tsx'
 import SessionsList from './pages/SessionsList.tsx'
 import SessionDetail from './pages/SessionDetail.tsx'
-import Providers from './pages/Providers.tsx'
-import Models from './pages/Models.tsx'
+import Resources from './pages/Resources.tsx'
 import Agents from './pages/Agents.tsx'
 import Skills from './pages/Skills.tsx'
-import Logs from './pages/Logs.tsx'
+
+function AppRoutes() {
+  const location = useLocation()
+
+  return (
+    <AnimatePresence mode="wait">
+      <motion.div
+        key={location.pathname}
+        initial={{ opacity: 0, y: 6 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: -6, transition: { duration: 0.15, ease: 'easeIn' } }}
+        transition={{
+          duration: 0.2,
+          ease: [0.16, 1, 0.3, 1],
+          delay: 0.05,
+        }}
+      >
+        <Routes location={location}>
+          <Route path="/" element={<Overview />} />
+          <Route path="/sessions" element={<SessionsList />} />
+          <Route path="/sessions/:id" element={<SessionDetail />} />
+          <Route path="/providers-models" element={<Resources />} />
+          <Route path="/providers" element={<Resources />} />
+          <Route path="/models" element={<Resources />} />
+          <Route path="/agents" element={<Agents />} />
+          <Route path="/skills" element={<Skills />} />
+        </Routes>
+      </motion.div>
+    </AnimatePresence>
+  )
+}
 
 function AppContent() {
   const isLoading = useAppStore((s) => s.isLoading)
@@ -25,8 +54,6 @@ function AppContent() {
   useEffect(() => {
     async function load() {
       setLoading(true)
-      // Data is loaded on-demand by each page, but we wait a tick
-      // so the loading overlay shows briefly on first mount
       await new Promise((resolve) => setTimeout(resolve, 300))
       setDataReady(true)
       setLoading(false)
@@ -48,17 +75,7 @@ function AppContent() {
       {(isLoading || isSyncing) && <LoadingOverlay message={isSyncing ? 'Syncing…' : 'Loading…'} />}
       <Layout onSync={onSync}>
         <ErrorBoundary>
-          <Routes>
-            <Route path="/" element={<Overview />} />
-            <Route path="/tokens" element={<TokenUsage />} />
-            <Route path="/sessions" element={<SessionsList />} />
-            <Route path="/sessions/:id" element={<SessionDetail />} />
-            <Route path="/providers" element={<Providers />} />
-            <Route path="/models" element={<Models />} />
-            <Route path="/agents" element={<Agents />} />
-            <Route path="/skills" element={<Skills />} />
-            <Route path="/logs" element={<Logs />} />
-          </Routes>
+          <AppRoutes />
         </ErrorBoundary>
       </Layout>
     </>

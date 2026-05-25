@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react'
+import ErrorMessage from './ErrorMessage.tsx'
 
 interface Props {
   children: ReactNode
@@ -23,8 +24,8 @@ export default class ErrorBoundary extends Component<Props, State> {
     console.error('ErrorBoundary caught:', error, errorInfo)
   }
 
-  handleReload = () => {
-    window.location.reload()
+  handleRetry = () => {
+    this.setState({ hasError: false, error: null })
   }
 
   render() {
@@ -33,42 +34,30 @@ export default class ErrorBoundary extends Component<Props, State> {
         <div
           style={{
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            height: '100%',
-            padding: 24,
+            padding: 48,
           }}
         >
-          <div
+          <ErrorMessage message={this.state.error?.message ?? 'An unexpected error occurred.'} />
+          <button
+            type="button"
+            onClick={this.handleRetry}
             style={{
-              maxWidth: 480,
-              padding: 32,
-              borderRadius: 12,
-              background: 'var(--bg-secondary)',
+              fontFamily: 'var(--sans)',
+              fontSize: 13,
+              padding: '6px 14px',
+              borderRadius: 4,
               border: '1px solid var(--border)',
-              textAlign: 'center',
+              background: 'var(--bg-tertiary)',
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              marginTop: 12,
             }}
           >
-            <h2 style={{ marginBottom: 12, color: 'var(--danger)' }}>Something went wrong</h2>
-            <p style={{ marginBottom: 20, color: 'var(--text-secondary)', fontSize: 14 }}>
-              {this.state.error?.message ?? 'An unexpected error occurred.'}
-            </p>
-            <button
-              type="button"
-              onClick={this.handleReload}
-              style={{
-                padding: '10px 20px',
-                borderRadius: 8,
-                border: 'none',
-                background: 'var(--accent)',
-                color: '#fff',
-                fontSize: 14,
-                cursor: 'pointer',
-              }}
-            >
-              Reload Page
-            </button>
-          </div>
+            Retry
+          </button>
         </div>
       )
     }

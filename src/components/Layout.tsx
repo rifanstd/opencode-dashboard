@@ -1,52 +1,66 @@
 import { useState, useEffect, type ReactNode } from 'react'
-import Sidebar from './Sidebar.tsx'
 import TopBar from './TopBar.tsx'
+import { getOverviewStats } from '../utils/overviewCache.ts'
 
 interface LayoutProps {
   children: ReactNode
   onSync: () => void
 }
 
+interface QuickStats {
+  totalSessions: number
+  totalTokens: number
+  totalCost: number
+}
+
 export default function Layout({ children, onSync }: LayoutProps) {
-  const [sidebarOpen, setSidebarOpen] = useState(() => window.innerWidth >= 1400)
+  const [quickStats, setQuickStats] = useState<QuickStats | null>(null)
 
   useEffect(() => {
-    const mq = window.matchMedia('(max-width: 1399px)')
-    const handler = (e: MediaQueryListEvent) => {
-      if (e.matches) setSidebarOpen(false)
-      else setSidebarOpen(true)
-    }
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
+    getOverviewStats().then((data) => {
+      setQuickStats({
+        totalSessions: data.totalSessions,
+        totalTokens:
+          data.totalInputTokens +
+          data.totalOutputTokens +
+          data.totalReasoningTokens +
+          data.totalCacheTokens,
+        totalCost: data.totalCost,
+      })
+    }).catch(() => {
+      setQuickStats(null)
+    })
   }, [])
 
   return (
     <div
       style={{
         display: 'flex',
+        flexDirection: 'column',
         height: '100vh',
         width: '100vw',
         overflow: 'hidden',
         background: 'var(--bg-primary)',
       }}
     >
-      {sidebarOpen && <Sidebar />}
-      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <TopBar
-          onSync={onSync}
-          onToggleSidebar={() => setSidebarOpen(!sidebarOpen)}
-          showSidebarToggle={window.innerWidth < 1400}
-        />
-        <main
-          style={{
-            flex: 1,
-            overflow: 'auto',
-            padding: 24,
-          }}
-        >
-          {children}
-        </main>
-      </div>
+      <TopBar onSync={onSync} quickStats={quickStats} />
+      <main
+        style={{
+          flex: 1,
+          overflow: 'auto',
+          padding: '32px 40px',
+        }}
+        className="layout-main"
+      >
+        {children}
+      </main>
+      <style>{`
+        @media (max-width: 768px) {
+          .layout-main {
+            padding: 20px !important;
+          }
+        }
+      `}</style>
     </div>
   )
 }

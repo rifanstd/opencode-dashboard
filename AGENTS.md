@@ -3,92 +3,97 @@
 ## Commands
 
 ```bash
-npm run dev      # Start Vite dev server (includes /api/sync endpoint)
-npm run build    # Type-check (tsc -b) then Vite build
-npm run lint     # ESLint over entire project
+npm run dev      # Start Vite dev server (serves /api/sync endpoint)
+npm run build    # Type-check (tsc -b) then Vite build — types block on failure
+npm run lint     # ESLint (flat config) across entire project
 npm run preview  # Preview production build locally
-npm run sync     # Export opencode data to public/data/ JSON files
+npm run sync     # Export opencode data → public/data/*.json
 ```
 
 **Build order matters:** `tsc -b` runs first; type errors block the Vite build.
 
 ## Data Architecture
 
-This is a **client-side dashboard** that reads opencode usage analytics. It uses a **hybrid approach**:
+**Client-side dashboard** — all data comes from static JSON in `public/data/`. No backend, no File System Access API.
 
-1. **Node.js sync script** (`scripts/sync-opencode-data.js`) reads the local opencode SQLite database and config files, then exports everything as JSON to `public/data/`.
-2. **Dashboard** loads JSON via standard `fetch()` — no backend server, no File System Access API.
-3. **"Sync" button** in the UI triggers `/api/sync` (Vite dev server middleware) which re-runs the script, then reloads the page.
+1. `scripts/sync-opencode-data.js` reads the local opencode SQLite DB + config, exports 11 JSON files to `public/data/`
+2. Pages load data on-demand via `src/utils/dataLoader.ts` → `fetch('/data/*.json')`
+3. "Sync" button in the UI → `fetch('/api/sync')` (Vite middleware spawns `node scripts/sync-opencode-data.js`) → page reloads
 
-**Critical:** `public/data/` is in `.gitignore`. Never commit generated JSON files — they contain user-specific data.
+**Critical:** `public/data/` is in `.gitignore`. Never commit generated JSON — it contains user-specific data.
 
 ### First-time setup
 
 ```bash
 npm install
-npm run sync   # Creates public/data/*.json from local opencode data
-npm run dev    # Starts dashboard
+npm run sync   # Required — creates public/data/ JSON files
+npm run dev
 ```
 
 ### Production build
 
 ```bash
-npm run sync   # Must run before build to generate JSON files
+npm run sync   # Required before build
 npm run build
 ```
 
-## TypeScript Quirks
+## Sync output (11 JSON files)
 
-- **Project references**: `tsconfig.json` is a solution file with two projects:
-  - `tsconfig.app.json` — application code (`src/`)
-  - `tsconfig.node.json` — Vite config (`vite.config.ts`)
-- **`verbatimModuleSyntax: true`** — only emit `import`/`export`. Use `import type` for type-only imports.
-- **`erasableSyntaxOnly: true`** — avoid `enum`, `namespace`, parameter properties, etc.
-- **`noUnusedLocals` / `noUnusedParameters: true`** — unused variables fail the build.
-- **`noFallthroughCasesInSwitch: true`** — switch fallthroughs are errors.
+The sync script produces exactly these files in `public/data/`:
 
-## Lint
+- `sessions.json`, `projects.json`, `messages.json`, `parts.json` — from SQLite
+- `overview.json`, `token-usage.json` — computed aggregates from DB
+- `providers.json` — from `auth.json` (local + config fallback)
+- `models.json` — from `models.json` in cache dir
+- `agents.json` — from `agents/*.md` in config dir
+- `skills.json` — from `skills-lock.json` in config dir
+- `logs.json` — from `log/*.log` in local dir
 
-- ESLint flat config in `eslint.config.js` (ESM, uses `defineConfig`/`globalIgnores` from `eslint/config`).
-- Uses `typescript-eslint`, `eslint-plugin-react-hooks`, `eslint-plugin-react-refresh`.
-- `dist/` is ignored.
+The sync script auto-detects opencode paths on Windows. Override via `OPENCODE_DATA_PATH` env var or `--local`, `--cache`, `--config` CLI args.
 
-## Project Structure
+## TypeScript strictness
 
-- Entry: `index.html` → `src/main.tsx`
-- Source lives in `src/` only.
-- `package.json` sets `"type": "module"` (ESM-only).
-- **No test runner**, no CI config, no environment files.
+- **Project references**: `tsconfig.json` solution → `tsconfig.app.json` (`src/`) + `tsconfig.node.json` (`vite.config.ts`)
+- **`verbatimModuleSyntax: true`** — use `import type` for type-only imports or the build fails
+- **`erasableSyntaxOnly: true`** — no `enum`, `namespace`, parameter properties
+- **`noUnusedLocals` / `noUnusedParameters: true`** — unused imports/vars block `tsc -b`
+- **`noFallthroughCasesInSwitch: true`** — every case needs `break` or `return`
 
-### Key directories
+## Framework stack
 
-- `src/pages/` — Route components (Overview, TokenUsage, SessionsList, etc.)
-- `src/components/` — Shared UI components
-- `src/utils/` — Data loaders (`dataLoader.ts`), cost calculator, sync handler
-- `src/stores/` — Zustand stores (`appStore.ts`)
-- `src/types/` — TypeScript interfaces
-- `scripts/` — Node.js sync script (runs outside the build)
+| Concern | Choice |
+|---|---|
+| UI | React 19 + TypeScript |
+| Routing | React Router v7 (`BrowserRouter`) |
+| State | Zustand (`src/stores/appStore.ts`) |
+| Charts | Recharts |
+| DB (sync only) | sqlite3 (dev dep) |
+| Build | Vite 8 + `@vitejs/plugin-react` |
+| Lint | ESLint flat config (`defineConfig` + `globalIgnores`) |
 
-## Framework Stack
+## Project structure
 
-- React 19 + TypeScript + Vite
-- React Router v7 (`BrowserRouter` in `App.tsx`)
-- Zustand for state management (`useAppStore`)
-- Recharts for data visualization
-- `sqlite3` (dev dependency) for reading opencode.db during sync
+```
+src/
+  main.tsx          Entry point
+  App.tsx           Router + routes
+  pages/            Route components (Overview=Sessions=Sessions:id=Providers=Models=Agents=Skills)
+  components/       Shared UI (Layout, charts, sidebar, etc.)
+  utils/            Data loaders, cost calc, sync handler, log parser
+  stores/           Zustand store (appStore.ts)
+  types/            All TypeScript interfaces
+  workers/          Empty (legacy)
+  hooks/            Empty
+scripts/
+  sync-opencode-data.js    Node.js script (runs outside build)
+public/data/               Generated JSON (gitignored)
+```
 
-## Sync Script Details
+## Gotchas
 
-`scripts/sync-opencode-data.js`:
-- Auto-detects opencode data folders on Windows (`%USERPROFILE%/.local/share/opencode`, `%APPDATA%`, etc.)
-- Reads `opencode.db` (SQLite) and exports: sessions, messages, parts, projects, overview stats, token usage
-- Reads config files: `auth.json` (providers), `models.json`, `agents/*.md`, `skills-lock.json`, `log/*.log`
-- Outputs 11 JSON files to `public/data/`
-- Can be overridden via `OPENCODE_DATA_PATH` env var or CLI args (`--local`, `--cache`, `--config`)
-
-## Important Constraints
-
-- **Client-side only** — no backend API. All data comes from static JSON.
-- **Data is loaded on-demand** by each page via `dataLoader.ts` functions.
-- The `workers/` directory exists but is empty (legacy from previous sql.js implementation).
-- Do not add server-side code to the Vite build — the `/api/sync` middleware only works in dev mode.
+- **No test runner, CI, or env files** in this repo.
+- **`dataLoader.ts` silently returns `[]` on fetch failures** — pages render empty states instead of crashing. Don't add redundant error boundaries for missing data.
+- **`/api/sync` only works in dev mode** (Vite middleware in `vite.config.ts`). Production builds serve static files only.
+- **`src/hooks/` and `src/workers/` are empty** — leftover from earlier implementations.
+- **`prompt.md`** (root) is the project-level opencode context file — currently empty, may be populated later.
+- **Windows-first path detection** in sync script (`%USERPROFILE%`, `AppData/Local`, `AppData/Roaming`).

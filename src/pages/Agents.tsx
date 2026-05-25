@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Bot } from 'lucide-react'
 import { loadAgents } from '../utils/dataLoader.ts'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 
@@ -24,41 +25,87 @@ export default function Agents() {
         setLoading(false)
       }
     }
-
     fetch()
   }, [])
 
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-        <span style={{ color: 'var(--text-secondary)' }}>Loading agents…</span>
+        <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--sans)' }}>Loading agents…</span>
       </div>
     )
   }
 
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>Agents</h1>
+      <h1
+        style={{
+          fontFamily: 'var(--sans)',
+          fontSize: 22,
+          fontWeight: 600,
+          color: 'var(--text-primary)',
+          marginBottom: 20,
+        }}
+      >
+        Agents
+      </h1>
       {error && <ErrorMessage message={error} />}
       {agents.length === 0 && !error && (
-        <p style={{ color: 'var(--text-secondary)' }}>No agents found. Run `npm run sync` to export data.</p>
+        <div style={{ textAlign: 'center', padding: 40, fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--text-muted)' }}>
+          No agents found.
+        </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div style={{ display: 'flex', flexDirection: 'column' }}>
         {agents.map((a) => (
           <div
             key={a.filename}
             style={{
-              padding: 16,
-              borderRadius: 10,
-              background: 'var(--bg-secondary)',
-              border: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              padding: '12px 16px',
+              borderBottom: '1px solid var(--border)',
+              transition: 'background 100ms',
             }}
+            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(88,166,255,0.04)' }}
+            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
           >
-            <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: 4 }}>
-              {a.name}
+            <Bot size={16} style={{ color: 'var(--text-muted)', marginRight: 12, flexShrink: 0 }} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div
+                style={{
+                  fontFamily: 'var(--sans)',
+                  fontSize: 14,
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                }}
+              >
+                {a.name}
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--sans)',
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                  marginTop: 2,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {a.description}
+              </div>
             </div>
-            <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>{a.description}</div>
-            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 8 }}>{a.filename}</div>
+            <span
+              style={{
+                fontFamily: 'var(--mono)',
+                fontSize: 12,
+                color: 'var(--text-muted)',
+                marginLeft: 12,
+                flexShrink: 0,
+              }}
+            >
+              {a.filename}
+            </span>
           </div>
         ))}
       </div>

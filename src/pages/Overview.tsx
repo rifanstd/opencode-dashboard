@@ -1,22 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
-import {
-  Coins,
-  ArrowDownToLine,
-  DatabaseZap,
-  HardDrive,
-  ArrowUpFromLine,
-  ScrollText,
-  Server,
-  Cpu,
-  DollarSign,
-} from 'lucide-react'
-import {
-  loadOverviewStats,
-  loadTokenUsage,
-  loadSessions,
-  loadModels,
-  loadProviders,
-} from '../utils/dataLoader.ts'
+import { motion } from 'motion/react'
+import { loadTokenUsage, loadSessions, loadModels, loadProviders } from '../utils/dataLoader.ts'
+import { getOverviewStats } from '../utils/overviewCache.ts'
 import {
   buildPricingMap,
   computeKeyMetrics,
@@ -42,6 +27,17 @@ function useViewportWidth(): number {
     return () => window.removeEventListener('resize', handleResize)
   }, [])
   return width
+}
+
+function relativeTime(ms: number): string {
+  const seconds = Math.floor(ms / 1000)
+  if (seconds < 60) return 'just now'
+  const minutes = Math.floor(seconds / 60)
+  if (minutes < 60) return `${minutes} min ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours} hours ago`
+  const days = Math.floor(hours / 24)
+  return `${days} days ago`
 }
 
 function isValidOverview(data: unknown): data is OverviewStats {
@@ -74,19 +70,14 @@ export default function Overview() {
   const [error, setError] = useState<string | null>(null)
   const [tokenGranularity, setTokenGranularity] = useState<Granularity>('daily')
   const [costGranularity, setCostGranularity] = useState<Granularity>('daily')
+  const [loadedAt, setLoadedAt] = useState<number | null>(null)
+  const [now, setNow] = useState<number>(() => Date.now())
   const viewportWidth = useViewportWidth()
 
-  const iconMap: Record<string, React.ReactNode> = {
-    'Total Tokens':    <Coins size={28} />,
-    'Input Tokens':     <ArrowDownToLine size={28} />,
-    'Cache Miss':       <DatabaseZap size={28} />,
-    'Cache Read':       <HardDrive size={28} />,
-    'Output Tokens':    <ArrowUpFromLine size={28} />,
-    'Total Sessions':   <ScrollText size={28} />,
-    'Providers':        <Server size={28} />,
-    'Models':           <Cpu size={28} />,
-    'Estimated Cost':   <DollarSign size={28} />,
-  }
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60000)
+    return () => clearInterval(id)
+  }, [])
 
   useEffect(() => {
     async function fetch() {
@@ -94,7 +85,7 @@ export default function Overview() {
         setLoading(true)
         setError(null)
         const [ov, tu, ses, mod, prov] = await Promise.all([
-          loadOverviewStats(),
+          getOverviewStats(),
           loadTokenUsage(),
           loadSessions(),
           loadModels(),
@@ -113,6 +104,7 @@ export default function Overview() {
         setSessions(Array.isArray(ses) ? ses : [])
         setModels(Array.isArray(mod) ? mod : [])
         setProviders(Array.isArray(prov) ? prov : [])
+        setLoadedAt(Date.now())
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
       } finally {
@@ -164,7 +156,7 @@ export default function Overview() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-        <span style={{ color: 'var(--text-secondary)' }}>Loading overview…</span>
+        <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--sans)' }}>Loading overview…</span>
       </div>
     )
   }
@@ -172,7 +164,7 @@ export default function Overview() {
   if (error) {
     return (
       <div>
-        <h1 style={{ marginBottom: 24 }}>Overview</h1>
+        <h1 style={{ marginBottom: 24, fontFamily: 'var(--sans)' }}>Overview</h1>
         <ErrorMessage message={error} />
       </div>
     )
@@ -180,36 +172,109 @@ export default function Overview() {
 
   const chartContainerStyle: React.CSSProperties = {
     background: 'var(--bg-secondary)',
-    borderRadius: 10,
-    padding: 16,
-    border: '1px solid var(--border)',
+    borderRadius: 6,
+    padding: 20,
   }
 
   const isMobile = viewportWidth < 768
 
+  const lastSyncText = loadedAt ? relativeTime(now - loadedAt) : 'just now'
+
+  const summaryTokens = overview
+    ? overview.totalInputTokens + overview.totalOutputTokens + overview.totalReasoningTokens + overview.totalCacheTokens
+    : 0
+
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>Overview</h1>
+      <h1
+        style={{
+          fontFamily: 'var(--sans)',
+          fontSize: 24,
+          fontWeight: 600,
+          color: 'var(--text-primary)',
+          letterSpacing: '-0.5px',
+          marginBottom: 20,
+        }}
+      >
+        Overview
+      </h1>
+
+      {/* Summary Strip */}
+      <motion.div
+        initial={{ opacity: 0, y: -4 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.25, delay: 0 }}
+        style={{
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '4px 16px',
+          paddingBottom: 12,
+          marginBottom: 24,
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
+        <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+          Last sync:{' '}
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+            {lastSyncText}
+          </span>
+        </span>
+        <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+            · {overview ? overview.totalSessions.toLocaleString() : '—'}
+          </span>{' '}
+          sessions
+        </span>
+        <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+            · {overview ? summaryTokens.toLocaleString() : '—'}
+          </span>{' '}
+          tokens
+        </span>
+        <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+          <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
+            · {overview ? `$${overview.totalCost.toFixed(2)}` : '—'}
+          </span>{' '}
+          this month
+        </span>
+      </motion.div>
 
       {/* Section 1: Key Metrics */}
       <section style={{ marginBottom: 32 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 16 }}>Key Metrics</h2>
+        <h2
+          style={{
+            fontFamily: 'var(--sans)',
+            fontSize: 14,
+            fontWeight: 500,
+            color: 'var(--text-secondary)',
+            textTransform: 'uppercase',
+            letterSpacing: '0.5px',
+            marginBottom: 16,
+          }}
+        >
+          Key Metrics
+        </h2>
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(220px, 1fr))',
-            gap: 16,
+            gridTemplateColumns: isMobile ? '1fr 1fr' : 'repeat(auto-fill, minmax(200px, 1fr))',
+            gap: 12,
           }}
         >
-          {metrics.map((m) => (
-            <SummaryCard
+          {metrics.map((m, i) => (
+            <motion.div
               key={m.label}
-              label={m.label}
-              value={m.value}
-              subLabel={m.subLabel}
-              trend={m.trend}
-              icon={iconMap[m.label]}
-            />
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: i * 0.04 }}
+            >
+              <SummaryCard
+                label={m.label}
+                value={m.value}
+                subLabel={m.subLabel}
+                trend={m.trend}
+              />
+            </motion.div>
           ))}
         </div>
       </section>
@@ -220,29 +285,49 @@ export default function Overview() {
           style={{
             display: 'grid',
             gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
-            gap: 16,
+            gap: 12,
           }}
         >
-          <div style={chartContainerStyle}>
+          <motion.div
+            style={chartContainerStyle}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0 }}
+          >
             <TokenUsageChart
               data={tokenUsageChartData}
               granularity={tokenGranularity}
               onGranularityChange={setTokenGranularity}
             />
-          </div>
-          <div style={chartContainerStyle}>
+          </motion.div>
+          <motion.div
+            style={chartContainerStyle}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.08 }}
+          >
             <CostChart
               data={costChartData}
               granularity={costGranularity}
               onGranularityChange={setCostGranularity}
             />
-          </div>
-          <div style={chartContainerStyle}>
+          </motion.div>
+          <motion.div
+            style={chartContainerStyle}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.16 }}
+          >
             <ModelUsageChart data={modelUsageData} />
-          </div>
-          <div style={chartContainerStyle}>
+          </motion.div>
+          <motion.div
+            style={chartContainerStyle}
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.3, delay: 0.24 }}
+          >
             <TokenCompositionChart data={donutData} />
-          </div>
+          </motion.div>
         </div>
       </section>
     </div>

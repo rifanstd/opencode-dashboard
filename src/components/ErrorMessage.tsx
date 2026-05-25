@@ -1,3 +1,5 @@
+import { XCircle } from 'lucide-react'
+
 interface ErrorMessageProps {
   message: string
 }
@@ -6,16 +8,26 @@ export default function ErrorMessage({ message }: ErrorMessageProps) {
   return (
     <div
       style={{
-        padding: 16,
-        borderRadius: 8,
-        background: 'rgba(239, 68, 68, 0.15)',
-        color: 'var(--danger)',
-        fontSize: 14,
+        padding: '16px 20px',
+        borderRadius: 6,
+        background: 'var(--bg-secondary)',
+        borderLeft: '2px solid var(--danger)',
+        display: 'flex',
+        alignItems: 'flex-start',
+        gap: 10,
         marginBottom: 16,
-        border: '1px solid rgba(239, 68, 68, 0.3)',
       }}
     >
-      {message}
+      <XCircle size={16} style={{ color: 'var(--danger)', flexShrink: 0, marginTop: 1 }} />
+      <span
+        style={{
+          fontFamily: 'var(--sans)',
+          fontSize: 13,
+          color: 'var(--danger)',
+        }}
+      >
+        {message}
+      </span>
     </div>
   )
 }

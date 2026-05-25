@@ -1,10 +1,117 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { loadSessions, loadMessages, loadParts, loadModels } from '../utils/dataLoader.ts'
 import { loadPricing, calculateCost, formatCost } from '../utils/costCalculator.ts'
-import TokenChart from '../components/TokenChart.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 import type { Message, Part } from '../types/index.ts'
+
+function parseContent(content: string): ReactNode[] {
+  const nodes: ReactNode[] = []
+  const lines = content.split('\n')
+  let inCodeBlock = false
+  let codeBlockLines: string[] = []
+
+  function flushCodeBlock() {
+    if (codeBlockLines.length > 0) {
+      nodes.push(
+        <pre key={nodes.length} style={codeBlockStyle}>
+          <code>{codeBlockLines.join('\n')}</code>
+        </pre>
+      )
+      codeBlockLines = []
+    }
+  }
+
+  for (const line of lines) {
+    const trimmed = line.trim()
+    if (trimmed.startsWith('```')) {
+      if (inCodeBlock) {
+        flushCodeBlock()
+        inCodeBlock = false
+      } else {
+        if (codeBlockLines.length === 0 && nodes.length > 0) {
+          codeBlockLines = []
+        }
+        inCodeBlock = true
+      }
+      continue
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(line)
+      continue
+    }
+
+    // Parse inline code in this line
+    const parts = line.split(/(`[^`]+`)/g)
+    const lineNodes: ReactNode[] = []
+    parts.forEach((part, i) => {
+      if (part.startsWith('`') && part.endsWith('`')) {
+        const code = part.slice(1, -1)
+        lineNodes.push(
+          <code key={i} style={inlineCodeStyle}>{code}</code>
+        )
+      } else if (part.length > 0) {
+        lineNodes.push(<span key={i}>{part}</span>)
+      } else {
+        lineNodes.push(<span key={i}>{' '}</span>)
+      }
+    })
+    nodes.push(<div key={nodes.length}>{lineNodes.length > 0 ? lineNodes : <br />}</div>)
+  }
+
+  flushCodeBlock()
+  return nodes
+}
+
+const codeBlockStyle: React.CSSProperties = {
+  background: 'rgba(0,0,0,0.3)',
+  fontFamily: 'var(--mono)',
+  fontSize: 12,
+  padding: '12px 16px',
+  borderRadius: 4,
+  margin: '8px 0',
+  whiteSpace: 'pre-wrap',
+  overflowX: 'auto',
+  borderLeft: '2px solid var(--border-accent)',
+}
+
+const inlineCodeStyle: React.CSSProperties = {
+  fontFamily: 'var(--mono)',
+  fontSize: 12,
+  padding: '2px 6px',
+  borderRadius: 3,
+  background: 'rgba(88,166,255,0.1)',
+  color: 'var(--text-primary)',
+}
+
+const cardStyle: React.CSSProperties = {
+  background: 'var(--bg-secondary)',
+  borderRadius: 6,
+  padding: 20,
+}
+
+const cardLabelStyle: React.CSSProperties = {
+  fontFamily: 'var(--sans)',
+  fontSize: 11,
+  color: 'var(--text-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.5px',
+  marginBottom: 4,
+}
+
+const cardValueStyle: React.CSSProperties = {
+  fontFamily: 'var(--sans)',
+  fontSize: 13,
+  color: 'var(--text-primary)',
+}
+
+interface TokenBar {
+  label: string
+  value: number
+  total: number
+  opacity: number
+}
 
 export default function SessionDetail() {
   const { id } = useParams<{ id: string }>()
@@ -84,20 +191,66 @@ export default function SessionDetail() {
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
-        <span style={{ color: 'var(--text-secondary)' }}>Loading session…</span>
+        <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--sans)' }}>Loading session…</span>
       </div>
     )
   }
 
+  const tokenBars: TokenBar[] = session
+    ? [
+        { label: 'Input', value: session.input_tokens, total: session.total_tokens, opacity: 1 },
+        { label: 'Output', value: session.output_tokens, total: session.total_tokens, opacity: 0.8 },
+        { label: 'Reasoning', value: session.reasoning_tokens, total: session.total_tokens, opacity: 0.6 },
+        { label: 'Cache', value: session.cache_tokens, total: session.total_tokens, opacity: 0.4 },
+      ]
+    : []
+
   return (
     <div>
-      <Link to="/sessions" style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-        ← Back to sessions
+      <Link
+        to="/sessions"
+        style={{
+          fontFamily: 'var(--sans)',
+          fontSize: 13,
+          color: 'var(--text-secondary)',
+          textDecoration: 'none',
+        }}
+        onMouseEnter={(e) => { e.currentTarget.style.color = 'var(--text-primary)' }}
+        onMouseLeave={(e) => { e.currentTarget.style.color = 'var(--text-secondary)' }}
+      >
+        {'\u2190'} Back to Sessions
       </Link>
-      <h1 style={{ marginTop: 12, marginBottom: 8 }}>{session?.title ?? 'Session'}</h1>
+
+      <h1
+        style={{
+          fontFamily: 'var(--sans)',
+          fontSize: 22,
+          fontWeight: 600,
+          color: 'var(--text-primary)',
+          marginTop: 8,
+          marginBottom: 4,
+        }}
+      >
+        {session?.title ?? 'Session'}
+      </h1>
+
       {error && <ErrorMessage message={error} />}
+
       {session && (
         <>
+          {/* Info bar */}
+          <div
+            style={{
+              fontFamily: 'var(--sans)',
+              fontSize: 13,
+              color: 'var(--text-muted)',
+              marginBottom: 24,
+            }}
+          >
+            {session.project_id ?? '—'} · {session.model_id ?? '—'} · {new Date(session.created_at).toLocaleString()}
+          </div>
+
+          {/* Detail Cards */}
           <div
             style={{
               display: 'grid',
@@ -106,57 +259,158 @@ export default function SessionDetail() {
               marginBottom: 24,
             }}
           >
-            <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Model</div>
-              <div style={{ fontSize: 14, color: 'var(--text-primary)', marginTop: 4 }}>{session.model_id ?? '—'}</div>
+            <div style={cardStyle}>
+              <div style={cardLabelStyle}>Model</div>
+              <div style={cardValueStyle}>{session.model_id ?? '—'}</div>
             </div>
-            <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Project</div>
-              <div style={{ fontSize: 14, color: 'var(--text-primary)', marginTop: 4 }}>{session.project_id ?? '—'}</div>
+            <div style={cardStyle}>
+              <div style={cardLabelStyle}>Project</div>
+              <div style={cardValueStyle}>{session.project_id ?? '—'}</div>
             </div>
-            <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Date</div>
-              <div style={{ fontSize: 14, color: 'var(--text-primary)', marginTop: 4 }}>{new Date(session.created_at).toLocaleString()}</div>
+            <div style={cardStyle}>
+              <div style={cardLabelStyle}>Date</div>
+              <div style={cardValueStyle}>{new Date(session.created_at).toLocaleString()}</div>
             </div>
-            <div style={{ padding: 12, background: 'var(--bg-secondary)', borderRadius: 8, border: '1px solid var(--border)' }}>
-              <div style={{ fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase' }}>Cost</div>
-              <div style={{ fontSize: 14, color: 'var(--text-primary)', marginTop: 4 }}>{session.cost != null ? formatCost(session.cost) : '—'}</div>
+            <div style={cardStyle}>
+              <div style={cardLabelStyle}>Cost</div>
+              <div style={cardValueStyle}>{session.cost != null ? formatCost(session.cost) : '—'}</div>
             </div>
           </div>
 
-          <h2 style={{ marginBottom: 12 }}>Token Breakdown</h2>
-          <div style={{ marginBottom: 24, background: 'var(--bg-secondary)', borderRadius: 10, padding: 16, border: '1px solid var(--border)' }}>
-            <TokenChart
-              type="bar"
-              data={[
-                {
-                  label: 'Tokens',
-                  input: session.input_tokens,
-                  output: session.output_tokens,
-                  reasoning: session.reasoning_tokens,
-                  cache: session.cache_tokens,
-                },
-              ]}
-            />
+          {/* Token Breakdown */}
+          <h2
+            style={{
+              fontFamily: 'var(--sans)',
+              fontSize: 14,
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              marginBottom: 16,
+            }}
+          >
+            Token Breakdown
+          </h2>
+          <div style={{ ...cardStyle, marginBottom: 24 }}>
+            {tokenBars.map((bar) => {
+              const pct = bar.total > 0 ? (bar.value / bar.total) * 100 : 0
+              return (
+                <div
+                  key={bar.label}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    marginBottom: 8,
+                  }}
+                >
+                  <span
+                    style={{
+                      fontFamily: 'var(--sans)',
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                      width: 100,
+                      flexShrink: 0,
+                    }}
+                  >
+                    {bar.label}
+                  </span>
+                  <div style={{ flex: 1, height: 8, background: 'var(--bg-tertiary)', borderRadius: 4, overflow: 'hidden' }}>
+                    <div
+                      style={{
+                        width: `${Math.max(pct, 1)}%`,
+                        height: '100%',
+                        background: 'var(--accent)',
+                        opacity: bar.opacity,
+                        borderRadius: 4,
+                      }}
+                    />
+                  </div>
+                  <span
+                    style={{
+                      fontFamily: 'var(--mono)',
+                      fontSize: 13,
+                      color: 'var(--text-primary)',
+                      fontVariantNumeric: 'tabular-nums',
+                      width: 80,
+                      textAlign: 'right',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {bar.value.toLocaleString()}
+                  </span>
+                </div>
+              )
+            })}
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 12,
+                borderTop: '1px solid var(--border)',
+                paddingTop: 8,
+                marginTop: 4,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: 'var(--sans)',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  color: 'var(--text-secondary)',
+                  width: 100,
+                  flexShrink: 0,
+                }}
+              >
+                Total
+              </span>
+              <div style={{ flex: 1 }} />
+              <span
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: 'var(--text-primary)',
+                  fontVariantNumeric: 'tabular-nums',
+                  width: 80,
+                  textAlign: 'right',
+                  flexShrink: 0,
+                }}
+              >
+                {session.total_tokens.toLocaleString()}
+              </span>
+            </div>
           </div>
 
-          <h2 style={{ marginBottom: 12 }}>Messages</h2>
+          {/* Messages */}
+          <h2
+            style={{
+              fontFamily: 'var(--sans)',
+              fontSize: 14,
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+              marginBottom: 16,
+            }}
+          >
+            Messages
+          </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {messages.map((msg) => (
               <div
                 key={msg.id}
                 style={{
                   padding: 16,
-                  borderRadius: 10,
-                  background: 'var(--bg-secondary)',
-                  border: '1px solid var(--border)',
+                  borderRadius: 6,
+                  background: 'var(--bg-tertiary)',
                 }}
               >
                 <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
                   <span
                     style={{
-                      fontSize: 12,
-                      fontWeight: 600,
+                      fontFamily: 'var(--sans)',
+                      fontSize: 11,
                       textTransform: 'uppercase',
                       color:
                         msg.role === 'user'
@@ -168,14 +422,14 @@ export default function SessionDetail() {
                   >
                     {msg.role}
                   </span>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
                     {new Date(msg.created_at).toLocaleString()}
                   </span>
                 </div>
                 {msg.content && (
-                  <p style={{ fontSize: 14, color: 'var(--text-primary)', marginBottom: 8, whiteSpace: 'pre-wrap' }}>
-                    {msg.content}
-                  </p>
+                  <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--sans)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                    {parseContent(msg.content)}
+                  </div>
                 )}
                 {partsMap[msg.id]?.map((part) => (
                   <div
@@ -184,20 +438,55 @@ export default function SessionDetail() {
                       marginTop: 8,
                       padding: 10,
                       borderRadius: 6,
-                      background: 'var(--bg-primary)',
-                      fontSize: 13,
+                      background: 'rgba(0,0,0,0.2)',
                     }}
                   >
-                    <div style={{ color: 'var(--text-muted)', fontSize: 11, textTransform: 'uppercase', marginBottom: 4 }}>
+                    <div
+                      style={{
+                        fontFamily: 'var(--sans)',
+                        fontSize: 11,
+                        color: 'var(--text-muted)',
+                        textTransform: 'uppercase',
+                        marginBottom: 4,
+                      }}
+                    >
                       {part.type}
                       {part.tool_name ? ` — ${part.tool_name}` : ''}
                     </div>
-                    {part.content && <div style={{ color: 'var(--text-secondary)' }}>{part.content}</div>}
+                    {part.content && (
+                      <div
+                        style={{
+                          fontFamily: 'var(--sans)',
+                          fontSize: 12,
+                          color: 'var(--text-secondary)',
+                        }}
+                      >
+                        {part.content}
+                      </div>
+                    )}
                     {part.tool_input && (
-                      <code style={{ display: 'block', marginTop: 4, fontSize: 12 }}>{part.tool_input}</code>
+                      <code
+                        style={{
+                          display: 'block',
+                          marginTop: 4,
+                          fontFamily: 'var(--mono)',
+                          fontSize: 12,
+                        }}
+                      >
+                        {part.tool_input}
+                      </code>
                     )}
                     {part.tool_output && (
-                      <code style={{ display: 'block', marginTop: 4, fontSize: 12 }}>{part.tool_output}</code>
+                      <code
+                        style={{
+                          display: 'block',
+                          marginTop: 4,
+                          fontFamily: 'var(--mono)',
+                          fontSize: 12,
+                        }}
+                      >
+                        {part.tool_output}
+                      </code>
                     )}
                   </div>
                 ))}

@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { Search } from 'lucide-react'
 import { loadSessions, loadModels } from '../utils/dataLoader.ts'
 import { loadPricing, calculateCost, formatCost } from '../utils/costCalculator.ts'
 import DataTable from '../components/DataTable.tsx'
@@ -120,55 +121,92 @@ export default function SessionsList() {
 
   const totalPages = Math.ceil(filtered.length / pageSize)
 
+  const filterInputStyle: React.CSSProperties = {
+    fontFamily: 'var(--sans)',
+    fontSize: 13,
+    height: 32,
+    background: 'var(--bg-tertiary)',
+    border: '1px solid var(--border)',
+    borderRadius: 4,
+    color: 'var(--text-primary)',
+    padding: '0 10px',
+    outline: 'none',
+  }
+
   return (
     <div>
-      <h1 style={{ marginBottom: 24 }}>Sessions</h1>
+      <h1
+        style={{
+          fontFamily: 'var(--sans)',
+          fontSize: 22,
+          fontWeight: 600,
+          color: 'var(--text-primary)',
+          marginBottom: 20,
+        }}
+      >
+        Sessions
+      </h1>
       {error && <ErrorMessage message={error} />}
 
       <div
         style={{
           display: 'flex',
-          gap: 12,
+          gap: 8,
           flexWrap: 'wrap',
           marginBottom: 20,
           alignItems: 'center',
         }}
       >
-        <input
-          type="text"
-          placeholder="Search…"
-          value={search}
-          onChange={(e) => { setSearch(e.target.value); setPage(0) }}
-          style={{ minWidth: 200 }}
-        />
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+          <Search
+            size={14}
+            style={{
+              position: 'absolute',
+              left: 8,
+              color: 'var(--text-muted)',
+              pointerEvents: 'none',
+            }}
+          />
+          <input
+            type="text"
+            placeholder="Search…"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(0) }}
+            style={{ ...filterInputStyle, minWidth: 200, paddingLeft: 28 }}
+          />
+        </div>
         <input
           type="text"
           placeholder="Project"
           value={projectFilter}
           onChange={(e) => { setProjectFilter(e.target.value); setPage(0) }}
-          style={{ minWidth: 140 }}
+          style={{ ...filterInputStyle, minWidth: 140 }}
         />
         <input
           type="text"
           placeholder="Model"
           value={modelFilter}
           onChange={(e) => { setModelFilter(e.target.value); setPage(0) }}
-          style={{ minWidth: 140 }}
+          style={{ ...filterInputStyle, minWidth: 140 }}
         />
         <input
           type="date"
           value={dateFrom}
           onChange={(e) => { setDateFrom(e.target.value); setPage(0) }}
+          style={filterInputStyle}
         />
         <input
           type="date"
           value={dateTo}
           onChange={(e) => { setDateTo(e.target.value); setPage(0) }}
+          style={filterInputStyle}
         />
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)' }}>Loading…</div>
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text-secondary)', fontFamily: 'var(--sans)' }}>
+          Loading…
+        </div>
       ) : (
         <>
           <DataTable<Session>
@@ -176,8 +214,8 @@ export default function SessionsList() {
               { key: 'title', header: 'Title' },
               { key: 'project_id', header: 'Project', render: (s) => s.project_id ?? '—' },
               { key: 'model_id', header: 'Model', render: (s) => s.model_id ?? '—' },
-              { key: 'total_tokens', header: 'Tokens', render: (s) => s.total_tokens.toLocaleString() },
-              { key: 'cost', header: 'Cost', render: (s) => (s.cost != null ? formatCost(s.cost) : '—') },
+              { key: 'total_tokens', header: 'Tokens', render: (s) => s.total_tokens.toLocaleString(), numeric: true },
+              { key: 'cost', header: 'Cost', render: (s) => (s.cost != null ? formatCost(s.cost) : '—'), numeric: true },
               { key: 'created_at', header: 'Date', render: (s) => new Date(s.created_at).toLocaleDateString() },
             ]}
             data={paginated}
@@ -195,26 +233,52 @@ export default function SessionsList() {
               marginTop: 16,
             }}
           >
-            <span style={{ color: 'var(--text-muted)', fontSize: 13 }}>
+            <span style={{ color: 'var(--text-muted)', fontSize: 12, fontFamily: 'var(--sans)' }}>
               {filtered.length} sessions
             </span>
-            <div style={{ display: 'flex', gap: 8 }}>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button
                 type="button"
                 disabled={page <= 0}
                 onClick={() => setPage(page - 1)}
-                style={{ padding: '6px 12px' }}
+                style={{
+                  fontFamily: 'var(--sans)',
+                  fontSize: 12,
+                  height: 28,
+                  padding: '0 10px',
+                  borderRadius: 4,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-tertiary)',
+                  color: page <= 0 ? 'var(--text-muted)' : 'var(--text-secondary)',
+                  cursor: page <= 0 ? 'default' : 'pointer',
+                }}
               >
                 Previous
               </button>
-              <span style={{ color: 'var(--text-secondary)', fontSize: 13, padding: '6px 0' }}>
+              <span
+                style={{
+                  color: 'var(--text-muted)',
+                  fontSize: 12,
+                  fontFamily: 'var(--sans)',
+                }}
+              >
                 Page {page + 1} of {totalPages || 1}
               </span>
               <button
                 type="button"
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(page + 1)}
-                style={{ padding: '6px 12px' }}
+                style={{
+                  fontFamily: 'var(--sans)',
+                  fontSize: 12,
+                  height: 28,
+                  padding: '0 10px',
+                  borderRadius: 4,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-tertiary)',
+                  color: page >= totalPages - 1 ? 'var(--text-muted)' : 'var(--text-secondary)',
+                  cursor: page >= totalPages - 1 ? 'default' : 'pointer',
+                }}
               >
                 Next
               </button>
