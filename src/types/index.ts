@@ -141,6 +141,25 @@ export interface TimeSeriesData {
 
 export type TimeRange = '7d' | '30d' | '90d' | 'all'
 
+/** Granularity for time-based chart filtering */
+export type Granularity = 'daily' | 'weekly' | 'monthly' | 'year' | 'all'
+
+/** Single data point for the 5-line Token Usage chart */
+export interface TokenUsageChartPoint {
+  date: string
+  inputTotal: number    // input + cache (all tokens sent)
+  cacheRead: number     // cache field only
+  cacheMiss: number     // input field only
+  output: number        // output field only
+  reasoning: number     // reasoning field only
+}
+
+/** Single bar for the Model Usage chart */
+export interface ModelUsageBarItem {
+  label: string
+  totalTokens: number
+}
+
 export interface MetricCardData {
   label: string
   value: string | number

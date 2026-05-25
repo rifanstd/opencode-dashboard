@@ -341,6 +341,7 @@ async function exportDatabase(dbPath) {
   const dayMap = {}
   const weekMap = {}
   const monthMap = {}
+  const yearMap = {}
   for (const s of sessions) {
     const date = new Date(s.created_at)
     if (isNaN(date.getTime())) continue
@@ -348,8 +349,9 @@ async function exportDatabase(dbPath) {
     const dayKey = date.toISOString().slice(0, 10)
     const weekKey = `${date.getFullYear()}-W${String(getWeek(date)).padStart(2, '0')}`
     const monthKey = date.toISOString().slice(0, 7)
+    const yearKey = String(date.getFullYear())
 
-    for (const [map, key] of [[dayMap, dayKey], [weekMap, weekKey], [monthMap, monthKey]]) {
+    for (const [map, key] of [[dayMap, dayKey], [weekMap, weekKey], [monthMap, monthKey], [yearMap, yearKey]]) {
       if (!map[key]) {
         map[key] = { date: key, input: 0, output: 0, reasoning: 0, cache: 0 }
       }
@@ -371,6 +373,7 @@ async function exportDatabase(dbPath) {
   const byDay = Object.values(dayMap).sort((a, b) => a.date.localeCompare(b.date))
   const byWeek = Object.values(weekMap).sort((a, b) => a.date.localeCompare(b.date))
   const byMonth = Object.values(monthMap).sort((a, b) => a.date.localeCompare(b.date))
+  const byYear = Object.values(yearMap).sort((a, b) => a.date.localeCompare(b.date))
 
   return {
     sessions,
@@ -385,6 +388,7 @@ async function exportDatabase(dbPath) {
       byDay,
       byWeek,
       byMonth,
+      byYear,
     },
   }
 }

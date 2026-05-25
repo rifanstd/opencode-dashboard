@@ -54,6 +54,13 @@ export interface TokenUsageData {
     reasoning: number
     cache: number
   }>
+  byYear: Array<{
+    date: string
+    input: number
+    output: number
+    reasoning: number
+    cache: number
+  }>
 }
 
 async function loadJson<T>(url: string): Promise<T> {

@@ -1,9 +1,19 @@
 import { useEffect, useState, useMemo } from 'react'
 import {
+  Coins,
+  ArrowDownToLine,
+  DatabaseZap,
+  HardDrive,
+  ArrowUpFromLine,
+  ScrollText,
+  Server,
+  Cpu,
+  DollarSign,
+} from 'lucide-react'
+import {
   loadOverviewStats,
   loadTokenUsage,
   loadSessions,
-  loadMessages,
   loadModels,
   loadProviders,
 } from '../utils/dataLoader.ts'
@@ -11,23 +21,17 @@ import {
   buildPricingMap,
   computeKeyMetrics,
   computeTokenComposition,
-  computeDailyActivity,
-  computeDailyCost,
-  computeTopModels,
-  computeTopProjects,
-  computeRecentSessions,
-  computeActivityHeatmap,
+  aggregateTokenUsageForChart,
+  aggregateCostForChart,
+  computeTopModelsForBar,
 } from '../utils/overviewDataProcessor.ts'
 import SummaryCard from '../components/SummaryCard.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
+import TokenUsageChart from '../components/TokenUsageChart.tsx'
+import ModelUsageChart from '../components/ModelUsageChart.tsx'
+import CostChart from '../components/CostChart.tsx'
 import TokenCompositionChart from '../components/TokenCompositionChart.tsx'
-import DailyActivityChart from '../components/DailyActivityChart.tsx'
-import CostTrendChart from '../components/CostTrendChart.tsx'
-import TopModelsChart from '../components/TopModelsChart.tsx'
-import ProjectActivityChart from '../components/ProjectActivityChart.tsx'
-import ActivityHeatmap from '../components/ActivityHeatmap.tsx'
-import RecentSessionsList from '../components/RecentSessionsList.tsx'
-import type { OverviewStats, TimeRange, Session, Message, ModelInfo, ProviderInfo } from '../types/index.ts'
+import type { OverviewStats, Session, ModelInfo, ProviderInfo, Granularity } from '../types/index.ts'
 import type { TokenUsageData } from '../utils/dataLoader.ts'
 
 function useViewportWidth(): number {
@@ -64,26 +68,35 @@ export default function Overview() {
   const [overview, setOverview] = useState<OverviewStats | null>(null)
   const [tokenUsage, setTokenUsage] = useState<TokenUsageData | null>(null)
   const [sessions, setSessions] = useState<Session[]>([])
-  const [messages, setMessages] = useState<Message[]>([])
   const [models, setModels] = useState<ModelInfo[]>([])
   const [providers, setProviders] = useState<ProviderInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [activityRange, setActivityRange] = useState<TimeRange>('30d')
-  const [costRange, setCostRange] = useState<TimeRange>('30d')
-  const [modelSortBy, setModelSortBy] = useState<'tokens' | 'cost'>('tokens')
+  const [tokenGranularity, setTokenGranularity] = useState<Granularity>('daily')
+  const [costGranularity, setCostGranularity] = useState<Granularity>('daily')
   const viewportWidth = useViewportWidth()
+
+  const iconMap: Record<string, React.ReactNode> = {
+    'Total Tokens':    <Coins size={28} />,
+    'Input Tokens':     <ArrowDownToLine size={28} />,
+    'Cache Miss':       <DatabaseZap size={28} />,
+    'Cache Read':       <HardDrive size={28} />,
+    'Output Tokens':    <ArrowUpFromLine size={28} />,
+    'Total Sessions':   <ScrollText size={28} />,
+    'Providers':        <Server size={28} />,
+    'Models':           <Cpu size={28} />,
+    'Estimated Cost':   <DollarSign size={28} />,
+  }
 
   useEffect(() => {
     async function fetch() {
       try {
         setLoading(true)
         setError(null)
-        const [ov, tu, ses, msg, mod, prov] = await Promise.all([
+        const [ov, tu, ses, mod, prov] = await Promise.all([
           loadOverviewStats(),
           loadTokenUsage(),
           loadSessions(),
-          loadMessages(),
           loadModels(),
           loadProviders(),
         ])
@@ -98,7 +111,6 @@ export default function Overview() {
         setOverview(ov)
         setTokenUsage(tu)
         setSessions(Array.isArray(ses) ? ses : [])
-        setMessages(Array.isArray(msg) ? msg : [])
         setModels(Array.isArray(mod) ? mod : [])
         setProviders(Array.isArray(prov) ? prov : [])
       } catch (err) {
@@ -130,37 +142,24 @@ export default function Overview() {
     return computeKeyMetrics(sessions, overview, tokenUsage, pricingMap, modelsCount, providersCount)
   }, [sessions, overview, tokenUsage, pricingMap, modelsCount, providersCount])
 
-  const tokenComposition = useMemo(() => {
+  const tokenUsageChartData = useMemo(() => {
+    if (!tokenUsage) return []
+    return aggregateTokenUsageForChart(tokenUsage, tokenGranularity)
+  }, [tokenUsage, tokenGranularity])
+
+  const costChartData = useMemo(() => {
+    return aggregateCostForChart(sessions, pricingMap, costGranularity)
+  }, [sessions, pricingMap, costGranularity])
+
+  const modelUsageData = useMemo(() => {
+    if (!tokenUsage) return []
+    return computeTopModelsForBar(tokenUsage)
+  }, [tokenUsage])
+
+  const donutData = useMemo(() => {
     if (!tokenUsage) return []
     return computeTokenComposition(tokenUsage)
   }, [tokenUsage])
-
-  const dailyActivity = useMemo(() => {
-    if (!tokenUsage) return []
-    return computeDailyActivity(tokenUsage, activityRange)
-  }, [tokenUsage, activityRange])
-
-  const dailyCost = useMemo(() => {
-    return computeDailyCost(sessions, pricingMap, costRange)
-  }, [sessions, pricingMap, costRange])
-
-  const topModels = useMemo(() => {
-    if (!tokenUsage) return []
-    return computeTopModels(tokenUsage, pricingMap, modelSortBy)
-  }, [tokenUsage, pricingMap, modelSortBy])
-
-  const topProjects = useMemo(() => {
-    if (!tokenUsage) return []
-    return computeTopProjects(tokenUsage)
-  }, [tokenUsage])
-
-  const recentSessions = useMemo(() => {
-    return computeRecentSessions(sessions, pricingMap, 10)
-  }, [sessions, pricingMap])
-
-  const heatmapData = useMemo(() => {
-    return computeActivityHeatmap(messages)
-  }, [messages])
 
   if (loading) {
     return (
@@ -202,80 +201,47 @@ export default function Overview() {
             gap: 16,
           }}
         >
-          {metrics.map((m, i) => (
+          {metrics.map((m) => (
             <SummaryCard
-              key={i}
+              key={m.label}
               label={m.label}
               value={m.value}
               subLabel={m.subLabel}
               trend={m.trend}
+              icon={iconMap[m.label]}
             />
           ))}
         </div>
       </section>
 
-      {/* Section 2: Trends */}
+      {/* Section 2: Charts */}
       <section style={{ marginBottom: 32 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 16 }}>Trends</h2>
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(360px, 1fr))',
+            gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
             gap: 16,
           }}
         >
           <div style={chartContainerStyle}>
-            <DailyActivityChart
-              data={dailyActivity}
-              range={activityRange}
-              onRangeChange={setActivityRange}
+            <TokenUsageChart
+              data={tokenUsageChartData}
+              granularity={tokenGranularity}
+              onGranularityChange={setTokenGranularity}
             />
           </div>
           <div style={chartContainerStyle}>
-            <CostTrendChart
-              data={dailyCost}
-              range={costRange}
-              onRangeChange={setCostRange}
-            />
-          </div>
-        </div>
-      </section>
-
-      {/* Section 3: Breakdowns */}
-      <section style={{ marginBottom: 32 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 16 }}>Breakdowns</h2>
-        <div
-          style={{
-            display: 'grid',
-            gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(300px, 1fr))',
-            gap: 16,
-          }}
-        >
-          <div style={chartContainerStyle}>
-            <TokenCompositionChart data={tokenComposition} />
-          </div>
-          <div style={chartContainerStyle}>
-            <TopModelsChart
-              data={topModels}
-              sortBy={modelSortBy}
-              onSortChange={setModelSortBy}
+            <CostChart
+              data={costChartData}
+              granularity={costGranularity}
+              onGranularityChange={setCostGranularity}
             />
           </div>
           <div style={chartContainerStyle}>
-            <ProjectActivityChart data={topProjects} />
-          </div>
-        </div>
-      </section>
-
-      {/* Section 4: Recent Activity */}
-      <section style={{ marginBottom: 32 }}>
-        <h2 style={{ fontSize: 18, marginBottom: 16 }}>Recent Activity</h2>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div style={chartContainerStyle}>
-            <ActivityHeatmap data={heatmapData} />
+            <ModelUsageChart data={modelUsageData} />
           </div>
           <div style={chartContainerStyle}>
-            <RecentSessionsList sessions={recentSessions} models={models} />
+            <TokenCompositionChart data={donutData} />
           </div>
         </div>
       </section>

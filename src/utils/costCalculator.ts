@@ -1,3 +1,5 @@
+import type { Granularity } from '../types/index.ts'
+
 export interface Pricing {
   input: number
   output: number
@@ -18,19 +20,16 @@ export function calculateCost(
 }
 
 export function formatCost(value: number): string {
-  if (!Number.isFinite(value)) return '$0.00'
-  if (value === 0) return '$0.00'
-  if (value < 1) {
-    return `$${value.toFixed(4)}`
-  }
+  if (!Number.isFinite(value) || value === 0) return '$0.00'
   return `$${value.toFixed(2)}`
 }
 
 /**
- * Formats a number with K/M suffix for compact display.
+ * Formats a number with K/M/B suffix for compact display.
  * - < 1000: standard locale formatting (e.g., "999")
  * - >= 1000 and < 1000000: X.XK with trailing ".0" stripped (e.g., 1500 → "1.5K", 1000 → "1K")
- * - >= 1000000: X.XM with trailing ".0" stripped (e.g., 2500000 → "2.5M", 2000000 → "2M")
+ * - >= 1000000 and < 1000000000: X.XM with trailing ".0" stripped (e.g., 2500000 → "2.5M", 2000000 → "2M")
+ * - >= 1000000000: X.XB with trailing ".0" stripped (e.g., 2500000000 → "2.5B", 1000000000 → "1B")
  */
 export function formatNumber(value: number): string {
   if (!Number.isFinite(value)) return '0'
@@ -40,9 +39,62 @@ export function formatNumber(value: number): string {
     const formatted = k.toFixed(1)
     return formatted.endsWith('.0') ? formatted.slice(0, -2) + 'K' : formatted + 'K'
   }
-  const m = value / 1000000
-  const formatted = m.toFixed(1)
-  return formatted.endsWith('.0') ? formatted.slice(0, -2) + 'M' : formatted + 'M'
+  if (value < 1000000000) {
+    const m = value / 1000000
+    const formatted = m.toFixed(1)
+    return formatted.endsWith('.0') ? formatted.slice(0, -2) + 'M' : formatted + 'M'
+  }
+  const b = value / 1000000000
+  const formatted = b.toFixed(1)
+  return formatted.endsWith('.0') ? formatted.slice(0, -2) + 'B' : formatted + 'B'
+}
+
+/** ISO week pattern: YYYY-Www */
+const isoWeekPattern = /^(\d{4})-W(\d{2})$/
+
+function parseISOWeekMonday(weekStr: string): Date | null {
+  const match = weekStr.match(isoWeekPattern)
+  if (!match) return null
+  const year = parseInt(match[1], 10)
+  const weekNum = parseInt(match[2], 10)
+  const jan4 = new Date(Date.UTC(year, 0, 4))
+  const jan4Day = jan4.getUTCDay() || 7
+  const mondayOfWeek1 = new Date(jan4)
+  mondayOfWeek1.setUTCDate(jan4.getUTCDate() - (jan4Day - 1))
+  const target = new Date(mondayOfWeek1)
+  target.setUTCDate(mondayOfWeek1.getUTCDate() + (weekNum - 1) * 7)
+  return target
+}
+
+/**
+ * Formats a date string for chart X-axis tick labels based on granularity.
+ * Handles "YYYY-MM-DD", "YYYY-MM", "YYYY", and "YYYY-Www" formats.
+ */
+export function formatDateTick(dateStr: string, granularity: Granularity): string {
+  let d: Date
+  if (isoWeekPattern.test(dateStr)) {
+    d = parseISOWeekMonday(dateStr) ?? new Date(NaN)
+  } else {
+    d = new Date(dateStr.length === 4 ? dateStr + '-01-01T00:00:00.000Z' : dateStr + 'T00:00:00.000Z')
+  }
+
+  if (isNaN(d.getTime())) return dateStr
+  const month = d.toLocaleDateString('en-US', { month: 'short', timeZone: 'UTC' })
+  const day = d.getUTCDate()
+  const year = d.getUTCFullYear()
+
+  switch (granularity) {
+    case 'year':
+      return String(year)
+    case 'monthly':
+      return `${month} ${year}`
+    case 'weekly':
+    case 'daily':
+      return `${month} ${day}`
+    case 'all':
+    default:
+      return `${month} ${day}`
+  }
 }
 
 export function loadPricing(modelsJson: unknown): Map<string, Pricing> {
