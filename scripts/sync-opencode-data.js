@@ -679,21 +679,89 @@ function exportJsonFiles(paths) {
     }
   }
 
-  // Skills from skills-lock.json
+  // ── Skills: discover by scanning SKILL.md files ──
+  const skillMap = new Map()
+  const home = process.env.USERPROFILE || process.env.HOME
+
+  // Helper to add skills to the map with precedence (first wins)
+  function addSkillsToMap(discovered, sourceLabel) {
+    for (const s of discovered) {
+      if (!skillMap.has(s.name)) {
+        skillMap.set(s.name, { ...s, sourceLabel })
+      }
+    }
+  }
+
+  // 1. Project-local paths (CWD-relative)
+  const cwd = process.cwd()
+  const localBases = [
+    { dir: path.join(cwd, '.opencode', 'skills'), label: 'project/.opencode' },
+    { dir: path.join(cwd, '.claude', 'skills'), label: 'project/.claude' },
+    { dir: path.join(cwd, '.agents', 'skills'), label: 'project/.agents' },
+  ]
+  for (const { dir, label } of localBases) {
+    const found = scanSkillDirectories(dir, label)
+    if (found.length) {
+      console.log(`  Found ${found.length} skill(s) in ${label}`)
+      addSkillsToMap(found, label)
+    }
+  }
+
+  // 2. Global paths (home-relative)
+  if (home) {
+    const globalBases = [
+      { dir: path.join(home, '.config', 'opencode', 'skills'), label: 'global/.config/opencode' },
+      { dir: path.join(home, '.claude', 'skills'), label: 'global/.claude' },
+      { dir: path.join(home, '.agents', 'skills'), label: 'global/.agents' },
+    ]
+    for (const { dir, label } of globalBases) {
+      const found = scanSkillDirectories(dir, label)
+      if (found.length) {
+        console.log(`  Found ${found.length} skill(s) in ${label}`)
+        addSkillsToMap(found, label)
+      }
+    }
+  }
+
+  // 3. Supplementary metadata from skills-lock.json (fixes nested "skills" bug)
+  const lockFileSources = new Map()
   if (paths.config) {
-    const skillsPath = path.join(paths.config, 'skills-lock.json')
-    const skillsJson = readJsonSafe(skillsPath)
-    if (skillsJson && typeof skillsJson === 'object') {
-      for (const [key, value] of Object.entries(skillsJson)) {
+    const lockPath = path.join(paths.config, 'skills-lock.json')
+    const lockJson = readJsonSafe(lockPath)
+    if (lockJson && typeof lockJson === 'object' && lockJson.skills && typeof lockJson.skills === 'object') {
+      for (const [key, value] of Object.entries(lockJson.skills)) {
         if (value && typeof value === 'object') {
-          skills.push({
-            name: key,
-            version: value.version ?? '—',
-            source: value.source ?? value.origin ?? '—',
-          })
+          lockFileSources.set(key, value.source ?? value.origin ?? null)
         }
       }
     }
+  }
+  // Also check project-root skills-lock.json
+  const projectLockPath = path.join(cwd, 'skills-lock.json')
+  const projectLockJson = readJsonSafe(projectLockPath)
+  if (projectLockJson && typeof projectLockJson === 'object' && projectLockJson.skills && typeof projectLockJson.skills === 'object') {
+    for (const [key, value] of Object.entries(projectLockJson.skills)) {
+      if (value && typeof value === 'object') {
+        lockFileSources.set(key, value.source ?? value.origin ?? null)
+      }
+    }
+  }
+
+  // 4. Build final skills array in UI-compatible shape
+  for (const [name, data] of skillMap) {
+    const lockSource = lockFileSources.get(name)
+    const derivedSource = lockSource ?? data.sourceLabel ?? '—'
+    skills.push({
+      name,
+      version: '—',
+      source: derivedSource,
+    })
+  }
+
+  if (skills.length === 0) {
+    console.log('  No skills found in any scanned directory')
+  } else {
+    console.log(`  Total unique skills exported: ${skills.length}`)
   }
 
   // Logs from log/*.log
