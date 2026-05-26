@@ -191,6 +191,34 @@ export default function SessionDetail() {
     ? (session.project_id ? (projectNameMap.get(session.project_id) ?? session.project_id) : null)
     : null
 
+  type MessageGroup =
+    | { type: 'user'; message: Message }
+    | { type: 'assistant'; messages: Message[] }
+    | { type: 'other'; message: Message }
+
+  const messageGroups = useMemo<MessageGroup[]>(() => {
+    const groups: MessageGroup[] = []
+    let assistantBuffer: Message[] = []
+
+    for (const msg of messages) {
+      if (msg.role === 'assistant') {
+        assistantBuffer.push(msg)
+      } else {
+        if (assistantBuffer.length > 0) {
+          groups.push({ type: 'assistant', messages: assistantBuffer })
+          assistantBuffer = []
+        }
+        groups.push({ type: msg.role === 'user' ? 'user' : 'other', message: msg })
+      }
+    }
+
+    if (assistantBuffer.length > 0) {
+      groups.push({ type: 'assistant', messages: assistantBuffer })
+    }
+
+    return groups
+  }, [messages])
+
   if (loading) {
     return (
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: 200 }}>
@@ -393,101 +421,140 @@ export default function SessionDetail() {
             Messages
           </h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-            {messages.map((msg) => (
-              <div
-                key={msg.id}
-                style={{
-                  padding: 16,
-                  borderRadius: 6,
-                  background: 'var(--bg-tertiary)',
-                }}
-              >
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-                  <span
-                    style={{
-                      fontFamily: 'var(--sans)',
-                      fontSize: 11,
-                      textTransform: 'uppercase',
-                      color:
-                        msg.role === 'user'
-                          ? 'var(--accent)'
-                          : msg.role === 'assistant'
-                          ? 'var(--success)'
-                          : 'var(--text-secondary)',
-                    }}
-                  >
-                    {msg.role}
-                  </span>
-                  <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
-                    {new Date(msg.created_at).toLocaleString()}
-                  </span>
-                </div>
-                {msg.content && (
-                  <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--sans)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                    {parseContent(msg.content)}
-                  </div>
-                )}
-                {partsMap[msg.id]?.map((part) => (
+            {messageGroups.map((group, groupIndex) => {
+              if (group.type === 'assistant') {
+                return (
                   <div
-                    key={part.id}
+                    key={`assistant-group-${groupIndex}`}
                     style={{
-                      marginTop: 8,
-                      padding: 10,
+                      padding: 16,
                       borderRadius: 6,
-                      background: 'rgba(0,0,0,0.2)',
+                      background: 'var(--bg-tertiary)',
                     }}
                   >
-                    <div
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                      <span
+                        style={{
+                          fontFamily: 'var(--sans)',
+                          fontSize: 11,
+                          textTransform: 'uppercase',
+                          color: 'var(--success)',
+                        }}
+                      >
+                        assistant {group.messages.length > 1 ? `(${group.messages.length} turns)` : ''}
+                      </span>
+                    </div>
+                    {group.messages.map((msg, idx) => (
+                      <div key={msg.id}>
+                        {idx > 0 && (
+                          <div
+                            style={{
+                              borderTop: '1px solid var(--border)',
+                              margin: '12px 0',
+                              opacity: 0.5,
+                            }}
+                          />
+                        )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                          <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+                            Turn {idx + 1}
+                          </span>
+                          <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+                            {new Date(msg.created_at).toLocaleString()}
+                          </span>
+                        </div>
+                        {msg.content && (
+                          <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--sans)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                            {parseContent(msg.content)}
+                          </div>
+                        )}
+                        {partsMap[msg.id]?.map((part) => (
+                          <div key={part.id} style={{ marginTop: 8, padding: 10, borderRadius: 6, background: 'rgba(0,0,0,0.2)' }}>
+                            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>
+                              {part.type}
+                              {part.tool_name ? ` — ${part.tool_name}` : ''}
+                            </div>
+                            {part.content && (
+                              <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                                {part.content}
+                              </div>
+                            )}
+                            {part.tool_input && (
+                              <code style={{ display: 'block', marginTop: 4, fontFamily: 'var(--mono)', fontSize: 12 }}>
+                                {part.tool_input}
+                              </code>
+                            )}
+                            {part.tool_output && (
+                              <code style={{ display: 'block', marginTop: 4, fontFamily: 'var(--mono)', fontSize: 12 }}>
+                                {part.tool_output}
+                              </code>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ))}
+                  </div>
+                )
+              }
+
+              const msg = group.type === 'user' ? group.message : group.message
+              const roleColor = msg.role === 'user' ? 'var(--accent)' : 'var(--text-secondary)'
+
+              return (
+                <div
+                  key={msg.id}
+                  style={{
+                    padding: 16,
+                    borderRadius: 6,
+                    background: 'var(--bg-tertiary)',
+                  }}
+                >
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span
                       style={{
                         fontFamily: 'var(--sans)',
                         fontSize: 11,
-                        color: 'var(--text-muted)',
                         textTransform: 'uppercase',
-                        marginBottom: 4,
+                        color: roleColor,
                       }}
                     >
-                      {part.type}
-                      {part.tool_name ? ` — ${part.tool_name}` : ''}
-                    </div>
-                    {part.content && (
-                      <div
-                        style={{
-                          fontFamily: 'var(--sans)',
-                          fontSize: 12,
-                          color: 'var(--text-secondary)',
-                        }}
-                      >
-                        {part.content}
-                      </div>
-                    )}
-                    {part.tool_input && (
-                      <code
-                        style={{
-                          display: 'block',
-                          marginTop: 4,
-                          fontFamily: 'var(--mono)',
-                          fontSize: 12,
-                        }}
-                      >
-                        {part.tool_input}
-                      </code>
-                    )}
-                    {part.tool_output && (
-                      <code
-                        style={{
-                          display: 'block',
-                          marginTop: 4,
-                          fontFamily: 'var(--mono)',
-                          fontSize: 12,
-                        }}
-                      >
-                        {part.tool_output}
-                      </code>
-                    )}
+                      {msg.role}
+                    </span>
+                    <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+                      {new Date(msg.created_at).toLocaleString()}
+                    </span>
                   </div>
-                ))}
-              </div>
-            ))}
+                  {msg.content && (
+                    <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--sans)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                      {parseContent(msg.content)}
+                    </div>
+                  )}
+                  {partsMap[msg.id]?.map((part) => (
+                    <div key={part.id} style={{ marginTop: 8, padding: 10, borderRadius: 6, background: 'rgba(0,0,0,0.2)' }}>
+                      <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>
+                        {part.type}
+                        {part.tool_name ? ` — ${part.tool_name}` : ''}
+                      </div>
+                      {part.content && (
+                        <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                          {part.content}
+                        </div>
+                      )}
+                      {part.tool_input && (
+                        <code style={{ display: 'block', marginTop: 4, fontFamily: 'var(--mono)', fontSize: 12 }}>
+                          {part.tool_input}
+                        </code>
+                      )}
+                      {part.tool_output && (
+                        <code style={{ display: 'block', marginTop: 4, fontFamily: 'var(--mono)', fontSize: 12 }}>
+                          {part.tool_output}
+                        </code>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            })}
           </div>
         </>
       )}
