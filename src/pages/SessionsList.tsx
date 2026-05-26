@@ -15,8 +15,6 @@ export default function SessionsList() {
   const [error, setError] = useState<string | null>(null)
 
   const [search, setSearch] = useState('')
-  const [projectFilter, setProjectFilter] = useState('')
-  const [modelFilter, setModelFilter] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
   const [sortBy, setSortBy] = useState('created_at')
@@ -76,24 +74,13 @@ export default function SessionsList() {
       const q = search.toLowerCase()
       result = result.filter((s) => {
         const projectName = s.project_id ? (projectNameMap.get(s.project_id) ?? s.project_id) : ''
+        const modelName = s.model_id ?? ''
         return (
           s.title.toLowerCase().includes(q) ||
           projectName.toLowerCase().includes(q) ||
-          (s.model_id?.toLowerCase().includes(q) ?? false)
+          modelName.toLowerCase().includes(q)
         )
       })
-    }
-
-    if (projectFilter) {
-      const pf = projectFilter.toLowerCase()
-      result = result.filter((s) => {
-        const projectName = s.project_id ? (projectNameMap.get(s.project_id) ?? '') : ''
-        return projectName.toLowerCase().includes(pf)
-      })
-    }
-
-    if (modelFilter) {
-      result = result.filter((s) => s.model_id?.toLowerCase().includes(modelFilter.toLowerCase()))
     }
 
     if (dateFrom) {
@@ -119,7 +106,7 @@ export default function SessionsList() {
     })
 
     return result
-  }, [allSessions, search, projectFilter, modelFilter, dateFrom, dateTo, sortBy, sortOrder, projectNameMap])
+  }, [allSessions, search, dateFrom, dateTo, sortBy, sortOrder, projectNameMap])
 
   const paginated = useMemo(() => {
     return filtered.slice(page * pageSize, (page + 1) * pageSize)
@@ -191,20 +178,6 @@ export default function SessionsList() {
             style={{ ...filterInputStyle, minWidth: 200, paddingLeft: 28 }}
           />
         </div>
-        <input
-          type="text"
-          placeholder="Project"
-          value={projectFilter}
-          onChange={(e) => { setProjectFilter(e.target.value); setPage(0) }}
-          style={{ ...filterInputStyle, minWidth: 140 }}
-        />
-        <input
-          type="text"
-          placeholder="Model"
-          value={modelFilter}
-          onChange={(e) => { setModelFilter(e.target.value); setPage(0) }}
-          style={{ ...filterInputStyle, minWidth: 140 }}
-        />
         <input
           type="date"
           value={dateFrom}
