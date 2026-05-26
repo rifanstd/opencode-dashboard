@@ -61,6 +61,16 @@ export default function SessionsList() {
     setPage(0)
   }
 
+  const clearFilters = () => {
+    setSearch('')
+    setDateFrom('')
+    setDateTo('')
+    setQuickFilter(null)
+    setPage(0)
+  }
+
+  const hasActiveFilters = search || dateFrom || dateTo || quickFilter
+
   useEffect(() => {
     async function fetch() {
       try {
@@ -210,6 +220,7 @@ export default function SessionsList() {
             <button
               key={qf}
               type="button"
+              aria-pressed={active}
               onClick={() => applyQuickFilter(qf)}
               style={{
                 fontFamily: 'var(--sans)',
@@ -248,6 +259,30 @@ export default function SessionsList() {
             style={filterInputStyle}
           />
         </label>
+
+        {/* Clear filters button */}
+        {hasActiveFilters && (
+          <button
+            type="button"
+            onClick={clearFilters}
+            style={{
+              fontFamily: 'var(--sans)',
+              fontSize: 12,
+              height: 32,
+              padding: '0 12px',
+              borderRadius: 4,
+              border: '1px solid var(--border)',
+              background: 'transparent',
+              color: 'var(--text-secondary)',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            ✕ Clear
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -286,6 +321,7 @@ export default function SessionsList() {
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               <button
                 type="button"
+                aria-label="Previous page"
                 disabled={page <= 0}
                 onClick={() => setPage(page - 1)}
                 style={{
@@ -313,6 +349,7 @@ export default function SessionsList() {
               </span>
               <button
                 type="button"
+                aria-label="Next page"
                 disabled={page >= totalPages - 1}
                 onClick={() => setPage(page + 1)}
                 style={{
@@ -321,9 +358,9 @@ export default function SessionsList() {
                   height: 28,
                   padding: '0 10px',
                   borderRadius: 4,
-                  border: '1px solid var(--border)',
-                  background: 'var(--bg-tertiary)',
-                  color: page >= totalPages - 1 ? 'var(--text-muted)' : 'var(--text-secondary)',
+                  border: page >= totalPages - 1 ? '1px solid var(--border)' : '1px solid var(--accent)',
+                  background: page >= totalPages - 1 ? 'var(--bg-tertiary)' : 'var(--accent)',
+                  color: page >= totalPages - 1 ? 'var(--text-muted)' : '#ffffff',
                   cursor: page >= totalPages - 1 ? 'default' : 'pointer',
                 }}
               >

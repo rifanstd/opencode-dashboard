@@ -29,8 +29,8 @@ Current issues observed:
 
 ### SessionDetail
 
-- **FR-06 (Info Bar Differentiation):** The info bar directly under the session title must display information **different from** the four detail cards (Model, Project, Date, Cost). It must not repeat the same values.
-  - *Test:* The info bar text must not contain the exact model ID, project name, full date string, or formatted cost that appear in the detail cards below it.
+- **FR-06 (Info Bar Differentiation):** The info bar directly under the session title must display a **summary sentence** that provides at-a-glance session metadata: `{messageCount} messages · {totalTokens} tokens · {cost} · {shortModelName}`. While cost and short model name also appear in the detail cards, they are presented here as part of a compact summary format (per approved Q1 design decision), not as duplicated standalone values.
+  - *Test:* The info bar shows a summary sentence; the detail cards below show the same values in individual labeled cards. The info bar must not show the full model ID, full project name, or full date string as standalone values.
 
 - **FR-07 (Detail Cards Equal Size):** All detail cards in the top grid must have **equal width and equal height** within the same row.
   - *Test:* Inspecting the rendered cards shows identical `offsetWidth` and `offsetHeight` for all four cards on the same viewport.

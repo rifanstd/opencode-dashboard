@@ -101,6 +101,60 @@ interface TokenBar {
   opacity: number
 }
 
+function PartSection({ part }: { part: Part }) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <div style={{ marginTop: 6, borderRadius: 6, background: 'rgba(0,0,0,0.15)', overflow: 'hidden' }}>
+      <button
+        type="button"
+        onClick={() => setIsOpen(!isOpen)}
+        aria-expanded={isOpen}
+        style={{
+          width: '100%',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 12px',
+          background: 'transparent',
+          border: 'none',
+          cursor: 'pointer',
+          fontFamily: 'var(--sans)',
+          fontSize: 11,
+          textTransform: 'uppercase',
+          color: 'var(--text-muted)',
+          textAlign: 'left',
+        }}
+      >
+        <span>
+          {part.type}
+          {part.tool_name ? ` — ${part.tool_name}` : ''}
+          {isOpen ? ' ▾' : ' ▸'}
+        </span>
+      </button>
+      {isOpen && (
+        <div style={{ padding: '0 12px 12px' }}>
+          {part.content && (
+            <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text-secondary)', whiteSpace: 'pre-wrap', lineHeight: 1.5 }}>
+              {part.content}
+            </div>
+          )}
+          {part.tool_input && (
+            <code style={{ display: 'block', marginTop: 8, fontFamily: 'var(--mono)', fontSize: 11, background: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 4, overflowX: 'auto' }}>
+              {part.tool_input}
+            </code>
+          )}
+          {part.tool_output && (
+            <code style={{ display: 'block', marginTop: 8, fontFamily: 'var(--mono)', fontSize: 11, background: 'rgba(0,0,0,0.2)', padding: 8, borderRadius: 4, overflowX: 'auto' }}>
+              {part.tool_output}
+            </code>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function SessionDetail() {
   const { id } = useParams<{ id: string }>()
   const [session, setSession] = useState<{
@@ -123,6 +177,7 @@ export default function SessionDetail() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [expandedOthers, setExpandedOthers] = useState<Set<string>>(new Set())
+  const [expandedMessages, setExpandedMessages] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function fetch() {
@@ -191,6 +246,28 @@ export default function SessionDetail() {
       }
       return next
     })
+  }
+
+  const toggleMessageExpand = (msgId: string) => {
+    setExpandedMessages((prev) => {
+      const next = new Set(prev)
+      if (next.has(msgId)) {
+        next.delete(msgId)
+      } else {
+        next.add(msgId)
+      }
+      return next
+    })
+  }
+
+  function getMessageContentLength(msg: Message): number {
+    const parts = partsMap[msg.id] ?? []
+    return parts.reduce((sum, part) => sum + (part.content?.length ?? 0), 0) + (msg.content?.length ?? 0)
+  }
+
+  function truncateText(text: string, maxLength: number): string {
+    if (text.length <= maxLength) return text
+    return text.slice(0, maxLength) + '...'
   }
 
   const projectNameMap = useMemo(() => {
@@ -458,60 +535,96 @@ export default function SessionDetail() {
                         assistant {group.messages.length > 1 ? `(${group.messages.length} turns)` : ''}
                       </span>
                     </div>
-                    {group.messages.map((msg, idx) => (
-                      <div key={msg.id}>
-                        {idx > 0 && (
-                          <div
-                            style={{
-                              borderTop: '1px solid var(--border)',
-                              margin: '12px 0',
-                              opacity: 0.5,
-                            }}
-                          />
-                        )}
-                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
-                          <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
-                            Turn {idx + 1}
-                          </span>
-                          <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
-                            {new Date(msg.created_at).toLocaleString()}
-                          </span>
-                        </div>
-                        {msg.content && (
-                          <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--sans)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-                            {parseContent(msg.content)}
+                    {group.messages.map((msg, idx) => {
+                      const msgParts = partsMap[msg.id] ?? []
+                      const textParts = msgParts.filter((p) => p.type === 'text')
+                      const nonTextParts = msgParts.filter((p) => p.type !== 'text')
+                      const contentLength = getMessageContentLength(msg)
+                      const isExpanded = expandedMessages.has(msg.id)
+                      const shouldTruncate = contentLength > 1000 && !isExpanded
+
+                      return (
+                        <div key={msg.id}>
+                          {idx > 0 && (
+                            <div
+                              style={{
+                                borderTop: '1px solid var(--border)',
+                                margin: '12px 0',
+                                opacity: 0.5,
+                              }}
+                            />
+                          )}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4 }}>
+                            <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+                              Turn {idx + 1}
+                            </span>
+                            <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
+                              {new Date(msg.created_at).toLocaleString()}
+                            </span>
                           </div>
-                        )}
-                        {partsMap[msg.id]?.map((part) => (
-                          <div key={part.id} style={{ marginTop: 8, padding: 10, borderRadius: 6, background: 'rgba(0,0,0,0.2)' }}>
-                            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>
-                              {part.type}
-                              {part.tool_name ? ` — ${part.tool_name}` : ''}
+
+                          {/* Text parts - always visible, nicely formatted */}
+                          {textParts.length > 0 && (
+                            <div style={{ marginBottom: 8 }}>
+                              {textParts.map((part) => (
+                                <div key={part.id}>
+                                  {part.content && (
+                                    <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--sans)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                                      {shouldTruncate
+                                        ? parseContent(truncateText(part.content, 800))
+                                        : parseContent(part.content)}
+                                    </div>
+                                  )}
+                                </div>
+                              ))}
                             </div>
-                            {part.content && (
-                              <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text-secondary)' }}>
-                                {part.content}
-                              </div>
-                            )}
-                            {part.tool_input && (
-                              <code style={{ display: 'block', marginTop: 4, fontFamily: 'var(--mono)', fontSize: 12 }}>
-                                {part.tool_input}
-                              </code>
-                            )}
-                            {part.tool_output && (
-                              <code style={{ display: 'block', marginTop: 4, fontFamily: 'var(--mono)', fontSize: 12 }}>
-                                {part.tool_output}
-                              </code>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    ))}
+                          )}
+
+                          {/* Message content (fallback if no text parts) */}
+                          {msg.content && textParts.length === 0 && (
+                            <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--sans)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                              {shouldTruncate
+                                ? parseContent(truncateText(msg.content, 800))
+                                : parseContent(msg.content)}
+                            </div>
+                          )}
+
+                          {/* Show more/less button for truncated content */}
+                          {contentLength > 1000 && (
+                            <button
+                              type="button"
+                              onClick={() => toggleMessageExpand(msg.id)}
+                              style={{
+                                fontFamily: 'var(--sans)',
+                                fontSize: 12,
+                                color: 'var(--accent)',
+                                background: 'transparent',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '4px 0',
+                                marginTop: 4,
+                              }}
+                            >
+                              {isExpanded ? 'Show less' : 'Show more'}
+                            </button>
+                          )}
+
+                          {/* Non-text parts - collapsible */}
+                          {nonTextParts.length > 0 && (
+                            <div style={{ marginTop: 8 }}>
+                              {nonTextParts.map((part) => (
+                                <PartSection key={part.id} part={part} />
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })}
                   </div>
                 )
               }
 
-              const msg = group.type === 'user' ? group.message : group.message
+              const msg = group.message
 
               if (group.type === 'other') {
                 const isExpanded = expandedOthers.has(msg.id)
