@@ -563,7 +563,7 @@ function exportJsonFiles(paths) {
           if (modelData.status === 'deprecated') continue
 
           // Pricing from modelData.cost.{input,output,cache_read} (per-1M-tokens)
-          // Convert to per-token by dividing by 1_000_000
+          // Values are already in per-1M-tokens format - pass through without conversion
           const cost = modelData.cost
           const rawInputPrice = Number(cost?.input ?? modelData.input_price ?? modelData.inputPrice ?? 0)
           const rawOutputPrice = Number(cost?.output ?? modelData.output_price ?? modelData.outputPrice ?? 0)
@@ -575,10 +575,10 @@ function exportJsonFiles(paths) {
             name: modelData.name ?? modelId,
             provider: providerId,
             capabilities: Array.isArray(modelData.capabilities) ? modelData.capabilities : [],
-            input_price: rawInputPrice / 1_000_000,
-            output_price: rawOutputPrice / 1_000_000,
-            reasoning_price: rawReasoningPrice != null ? rawReasoningPrice / 1_000_000 : undefined,
-            cache_price: rawCacheReadPrice / 1_000_000,
+            input_price: rawInputPrice,
+            output_price: rawOutputPrice,
+            reasoning_price: rawReasoningPrice != null ? rawReasoningPrice : undefined,
+            cache_price: rawCacheReadPrice,
             context_window: Number(modelData.context_window ?? modelData.contextWindow ?? 0),
           })
         }
