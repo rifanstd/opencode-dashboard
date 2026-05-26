@@ -108,6 +108,7 @@ export default function SessionDetail() {
     title: string
     project_id: string | null
     model_id: string | null
+    model_provider: string | null
     created_at: string
     input_tokens: number
     output_tokens: number
