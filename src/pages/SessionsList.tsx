@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
 import { loadSessions, loadModels, loadProjects } from '../utils/dataLoader.ts'
 import { loadPricing, calculateCost, formatCost, formatNumber } from '../utils/costCalculator.ts'
+import { shortenModelName } from '../utils/modelUtils.ts'
 import DataTable from '../components/DataTable.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 import type { Session, Project } from '../types/index.ts'
@@ -259,7 +260,7 @@ export default function SessionsList() {
             columns={[
               { key: 'title', header: 'Title' },
               { key: 'project_id', header: 'Project', render: (s) => projectNameMap.get(s.project_id ?? '') ?? s.project_id ?? '—' },
-              { key: 'model_id', header: 'Model', render: (s) => s.model_id ?? '—' },
+              { key: 'model_id', header: 'Model', render: (s) => shortenModelName(s.model_id, s.model_provider) },
               { key: 'total_tokens', header: 'Tokens', render: (s) => formatNumber(s.total_tokens), numeric: true },
               { key: 'cost', header: 'Cost', render: (s) => (s.cost != null ? formatCost(s.cost) : '—'), numeric: true },
               { key: 'created_at', header: 'Date', render: (s) => new Date(s.created_at).toLocaleDateString() },
