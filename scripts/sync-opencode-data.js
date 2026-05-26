@@ -167,6 +167,39 @@ function readLogFiles(dirPath) {
   return results
 }
 
+/**
+ * Parse simple YAML frontmatter from markdown text.
+ * Only handles top-level scalar key: value pairs.
+ * Returns a plain object of metadata.
+ */
+function parseYamlFrontmatter(text) {
+  const result = {}
+  if (!text || typeof text !== 'string') return result
+
+  const trimmed = text.trimStart()
+  if (!trimmed.startsWith('---')) return result
+
+  const endIdx = trimmed.indexOf('\n---', 4)
+  if (endIdx === -1) return result
+
+  const block = trimmed.slice(3, endIdx).trim()
+  const lines = block.split('\n')
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const colonIdx = line.indexOf(':')
+    if (colonIdx === -1) continue
+    const key = line.slice(0, colonIdx).trim()
+    const value = line.slice(colonIdx + 1).trim()
+    if (key) {
+      result[key] = value
+    }
+  }
+
+  return result
+}
+
 function runQuery(dbPath, sql, params = []) {
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
