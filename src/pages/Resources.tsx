@@ -179,10 +179,12 @@ export default function Resources() {
                     </div>
                   ) : (
                     providerModels.map((model) => {
-                      const inputPrice = model.input_price ? `$${model.input_price.toFixed(2)}/Mt input` : null
-                      const outputPrice = model.output_price ? `$${model.output_price.toFixed(2)}/Mt output` : null
+                      const inputPrice = model.input_price ? `$${model.input_price.toFixed(2)}/1M input` : null
+                      const outputPrice = model.output_price ? `$${model.output_price.toFixed(2)}/1M output` : null
+                      const cachePrice = model.cache_price ? `$${model.cache_price.toFixed(2)}/1M cache` : null
+                      const reasoningPrice = model.reasoning_price ? `$${model.reasoning_price.toFixed(2)}/1M reasoning` : null
                       const ctx = model.context_window ? `${(model.context_window / 1000).toFixed(0)}K ctx` : null
-                      const pricingParts = [inputPrice, outputPrice, ctx].filter(Boolean).join(' · ')
+                      const pricingParts = [inputPrice, outputPrice, cachePrice, reasoningPrice, ctx].filter(Boolean).join(' · ')
 
                       return (
                         <div
