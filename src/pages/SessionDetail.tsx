@@ -121,6 +121,7 @@ export default function SessionDetail() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [expandedOthers, setExpandedOthers] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     async function fetch() {
@@ -178,6 +179,18 @@ export default function SessionDetail() {
 
     fetch()
   }, [id])
+
+  const toggleOther = (msgId: string) => {
+    setExpandedOthers((prev) => {
+      const next = new Set(prev)
+      if (next.has(msgId)) {
+        next.delete(msgId)
+      } else {
+        next.add(msgId)
+      }
+      return next
+    })
+  }
 
   const projectNameMap = useMemo(() => {
     const map = new Map<string, string>()
@@ -498,6 +511,82 @@ export default function SessionDetail() {
               }
 
               const msg = group.type === 'user' ? group.message : group.message
+
+              if (group.type === 'other') {
+                const isExpanded = expandedOthers.has(msg.id)
+
+                return (
+                  <div
+                    key={msg.id}
+                    style={{
+                      borderRadius: 6,
+                      background: 'var(--bg-tertiary)',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => toggleOther(msg.id)}
+                      aria-expanded={isExpanded}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '12px 16px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--sans)',
+                        fontSize: 11,
+                        textTransform: 'uppercase',
+                        color: 'var(--text-secondary)',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <span>
+                        {msg.role} {isExpanded ? '▾' : '▸'}
+                      </span>
+                      <span style={{ color: 'var(--text-muted)' }}>
+                        {new Date(msg.created_at).toLocaleString()}
+                      </span>
+                    </button>
+                    {isExpanded && (
+                      <div style={{ padding: '0 16px 16px' }}>
+                        {msg.content && (
+                          <div style={{ fontSize: 13, color: 'var(--text-primary)', fontFamily: 'var(--sans)', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
+                            {parseContent(msg.content)}
+                          </div>
+                        )}
+                        {partsMap[msg.id]?.map((part) => (
+                          <div key={part.id} style={{ marginTop: 8, padding: 10, borderRadius: 6, background: 'rgba(0,0,0,0.2)' }}>
+                            <div style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)', textTransform: 'uppercase', marginBottom: 4 }}>
+                              {part.type}
+                              {part.tool_name ? ` — ${part.tool_name}` : ''}
+                            </div>
+                            {part.content && (
+                              <div style={{ fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text-secondary)' }}>
+                                {part.content}
+                              </div>
+                            )}
+                            {part.tool_input && (
+                              <code style={{ display: 'block', marginTop: 4, fontFamily: 'var(--mono)', fontSize: 12 }}>
+                                {part.tool_input}
+                              </code>
+                            )}
+                            {part.tool_output && (
+                              <code style={{ display: 'block', marginTop: 4, fontFamily: 'var(--mono)', fontSize: 12 }}>
+                                {part.tool_output}
+                              </code>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )
+              }
+
               const roleColor = msg.role === 'user' ? 'var(--accent)' : 'var(--text-secondary)'
 
               return (
