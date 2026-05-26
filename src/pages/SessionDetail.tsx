@@ -2,6 +2,7 @@ import { useEffect, useState, useMemo, type ReactNode } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { loadSessions, loadMessages, loadParts, loadModels, loadProjects } from '../utils/dataLoader.ts'
 import { loadPricing, calculateCost, formatCost, formatNumber } from '../utils/costCalculator.ts'
+import { shortenModelName } from '../utils/modelUtils.ts'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 import type { Message, Part, Project } from '../types/index.ts'
 
@@ -262,7 +263,7 @@ export default function SessionDetail() {
               marginBottom: 24,
             }}
           >
-            {projectName ?? '—'} · {session.model_id ?? '—'} · {new Date(session.created_at).toLocaleString()}
+            {messages.length} messages · {formatNumber(session.total_tokens)} tokens · {session.cost != null ? formatCost(session.cost) : '—'} · {shortenModelName(session.model_id, session.model_provider)}
           </div>
 
           {/* Detail Cards */}
