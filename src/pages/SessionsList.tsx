@@ -22,7 +22,7 @@ export default function SessionsList() {
   const [sortBy, setSortBy] = useState('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
-  const pageSize = 50
+  const pageSize = 20
 
   function getQuickFilterRange(filter: QuickFilter): { from: string; to: string } {
     const now = new Date()
