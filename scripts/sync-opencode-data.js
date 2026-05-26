@@ -200,6 +200,35 @@ function parseYamlFrontmatter(text) {
   return result
 }
 
+/**
+ * Scan a base directory for skill subdirectories containing SKILL.md.
+ * Returns an array of skill metadata objects.
+ */
+function scanSkillDirectories(baseDir, sourceHint) {
+  const results = []
+  try {
+    if (!fs.existsSync(baseDir)) return results
+    const entries = fs.readdirSync(baseDir, { withFileTypes: true })
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue
+      const skillFile = path.join(baseDir, entry.name, 'SKILL.md')
+      if (!fs.existsSync(skillFile)) continue
+      const content = fs.readFileSync(skillFile, 'utf-8')
+      const meta = parseYamlFrontmatter(content)
+      const name = meta.name || entry.name
+      results.push({
+        name,
+        description: meta.description || '',
+        skillPath: skillFile,
+        sourceHint,
+      })
+    }
+  } catch (err) {
+    // Silently ignore permission errors or unreadable directories
+  }
+  return results
+}
+
 function runQuery(dbPath, sql, params = []) {
   return new Promise((resolve, reject) => {
     const db = new sqlite3.Database(dbPath, sqlite3.OPEN_READONLY, (err) => {
