@@ -18,6 +18,13 @@ export interface TokenUsageData {
     output: number
     reasoning: number
     cache: number
+    providers?: Array<{
+      provider: string
+      input: number
+      output: number
+      reasoning: number
+      cache: number
+    }>
   }>
   byProvider: Array<{
     label: string

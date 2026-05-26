@@ -1,9 +1,9 @@
-import { useEffect, useState, type ReactNode } from 'react'
+import { useEffect, useState, useMemo, type ReactNode } from 'react'
 import { useParams, Link } from 'react-router-dom'
-import { loadSessions, loadMessages, loadParts, loadModels } from '../utils/dataLoader.ts'
-import { loadPricing, calculateCost, formatCost } from '../utils/costCalculator.ts'
+import { loadSessions, loadMessages, loadParts, loadModels, loadProjects } from '../utils/dataLoader.ts'
+import { loadPricing, calculateCost, formatCost, formatNumber } from '../utils/costCalculator.ts'
 import ErrorMessage from '../components/ErrorMessage.tsx'
-import type { Message, Part } from '../types/index.ts'
+import type { Message, Part, Project } from '../types/index.ts'
 
 function parseContent(content: string): ReactNode[] {
   const nodes: ReactNode[] = []
@@ -130,6 +130,7 @@ export default function SessionDetail() {
   } | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
   const [partsMap, setPartsMap] = useState<Record<string, Part[]>>({})
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -140,11 +141,12 @@ export default function SessionDetail() {
         setLoading(true)
         setError(null)
 
-        const [sessions, allMessages, allParts, models] = await Promise.all([
+        const [sessions, allMessages, allParts, models, projectsData] = await Promise.all([
           loadSessions(),
           loadMessages(),
           loadParts(),
           loadModels(),
+          loadProjects(),
         ])
 
         const s = sessions.find((x) => x.id === id)
@@ -169,6 +171,7 @@ export default function SessionDetail() {
         }
 
         setSession({ ...s, cost })
+        setProjects(projectsData)
 
         const msgs = allMessages.filter((m) => m.session_id === id)
         setMessages(msgs)
@@ -187,6 +190,18 @@ export default function SessionDetail() {
 
     fetch()
   }, [id])
+
+  const projectNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of projects) {
+      map.set(p.id, p.name)
+    }
+    return map
+  }, [projects])
+
+  const projectName = session
+    ? (session.project_id ? (projectNameMap.get(session.project_id) ?? session.project_id) : null)
+    : null
 
   if (loading) {
     return (
@@ -247,7 +262,7 @@ export default function SessionDetail() {
               marginBottom: 24,
             }}
           >
-            {session.project_id ?? '—'} · {session.model_id ?? '—'} · {new Date(session.created_at).toLocaleString()}
+            {projectName ?? '—'} · {session.model_id ?? '—'} · {new Date(session.created_at).toLocaleString()}
           </div>
 
           {/* Detail Cards */}
@@ -265,7 +280,7 @@ export default function SessionDetail() {
             </div>
             <div style={cardStyle}>
               <div style={cardLabelStyle}>Project</div>
-              <div style={cardValueStyle}>{session.project_id ?? '—'}</div>
+              <div style={cardValueStyle}>{projectName ?? '—'}</div>
             </div>
             <div style={cardStyle}>
               <div style={cardLabelStyle}>Date</div>
@@ -337,7 +352,7 @@ export default function SessionDetail() {
                       flexShrink: 0,
                     }}
                   >
-                    {bar.value.toLocaleString()}
+                    {formatNumber(bar.value)}
                   </span>
                 </div>
               )
@@ -377,7 +392,7 @@ export default function SessionDetail() {
                   flexShrink: 0,
                 }}
               >
-                {session.total_tokens.toLocaleString()}
+                {formatNumber(session.total_tokens)}
               </span>
             </div>
           </div>

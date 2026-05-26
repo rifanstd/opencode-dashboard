@@ -158,6 +158,13 @@ export interface TokenUsageChartPoint {
 export interface ModelUsageBarItem {
   label: string
   totalTokens: number
+  providers?: Array<{
+    provider: string
+    input: number
+    output: number
+    reasoning: number
+    cache: number
+  }>
 }
 
 export interface MetricCardData {

@@ -16,6 +16,7 @@ import TokenUsageChart from '../components/TokenUsageChart.tsx'
 import ModelUsageChart from '../components/ModelUsageChart.tsx'
 import CostChart from '../components/CostChart.tsx'
 import TokenCompositionChart from '../components/TokenCompositionChart.tsx'
+import { formatNumber, formatCost } from '../utils/costCalculator.ts'
 import type { OverviewStats, Session, ModelInfo, ProviderInfo, Granularity } from '../types/index.ts'
 import type { TokenUsageData } from '../utils/dataLoader.ts'
 
@@ -221,19 +222,19 @@ export default function Overview() {
         </span>
         <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
-            · {overview ? overview.totalSessions.toLocaleString() : '—'}
+            · {overview ? formatNumber(overview.totalSessions) : '—'}
           </span>{' '}
           sessions
         </span>
         <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
-            · {overview ? summaryTokens.toLocaleString() : '—'}
+            · {overview ? formatNumber(summaryTokens) : '—'}
           </span>{' '}
           tokens
         </span>
         <span style={{ fontFamily: 'var(--sans)', fontSize: 11, color: 'var(--text-muted)' }}>
           <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--text-secondary)' }}>
-            · {overview ? `$${overview.totalCost.toFixed(2)}` : '—'}
+            · {overview ? formatCost(overview.totalCost) : '—'}
           </span>{' '}
           this month
         </span>

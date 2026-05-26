@@ -118,6 +118,39 @@ function readTextFiles(dirPath, ext) {
   return results
 }
 
+/**
+ * Normalize a raw model identifier into:
+ * - shortName: provider-prefixed form for display (e.g., "fireworks/kimi-k2p6")
+ * - modelName: bare model name for aggregation (e.g., "kimi-k2p6")
+ */
+function normalizeModelName(modelId, providerHint) {
+  if (!modelId || typeof modelId !== 'string') {
+    return { shortName: modelId, modelName: modelId }
+  }
+
+  // Pattern 1: accounts/<provider>/models/<model>
+  const accountsMatch = modelId.match(/^accounts\/([^/]+)\/models\/(.+)$/)
+  if (accountsMatch) {
+    const provider = accountsMatch[1]
+    const modelName = accountsMatch[2]
+    return { shortName: `${provider}/${modelName}`, modelName }
+  }
+
+  // Pattern 2: already has provider prefix (<provider>/<model>)
+  const slashMatch = modelId.match(/^([^/]+)\/(.+)$/)
+  if (slashMatch) {
+    return { shortName: modelId, modelName: slashMatch[2] }
+  }
+
+  // Pattern 3: generic name — add provider hint if available
+  if (providerHint) {
+    return { shortName: `${providerHint}/${modelId}`, modelName: modelId }
+  }
+
+  // Fallback: unrecognizable, keep as-is
+  return { shortName: modelId, modelName: modelId }
+}
+
 function readLogFiles(dirPath) {
   const results = []
   try {
@@ -167,10 +200,12 @@ async function exportDatabase(dbPath) {
   const rawSessions = await runQuery(dbPath, 'SELECT * FROM session ORDER BY time_created DESC')
   const sessions = rawSessions.map((s) => {
     let modelId = s.model ?? null
+    let modelProvider = null
     if (modelId && typeof modelId === 'string' && modelId.startsWith('{')) {
       try {
         const parsed = JSON.parse(modelId)
         modelId = parsed.id ?? parsed.modelID ?? modelId
+        modelProvider = parsed.provider ?? null
       } catch {
         // keep original
       }
@@ -180,6 +215,7 @@ async function exportDatabase(dbPath) {
       title: s.title ?? 'Untitled',
       project_id: s.project_id ?? null,
       model_id: modelId,
+      model_provider: modelProvider,
       created_at: msToIso(s.time_created) ?? '',
       updated_at: msToIso(s.time_updated) ?? '',
       input_tokens: s.tokens_input ?? 0,
@@ -262,7 +298,8 @@ async function exportDatabase(dbPath) {
   const modelCounts = {}
   for (const s of sessions) {
     if (s.model_id) {
-      modelCounts[s.model_id] = (modelCounts[s.model_id] || 0) + 1
+      const normalized = normalizeModelName(s.model_id, s.model_provider)
+      modelCounts[normalized.modelName] = (modelCounts[normalized.modelName] || 0) + 1
     }
   }
   let mostUsedModel = 'N/A'
@@ -285,17 +322,49 @@ async function exportDatabase(dbPath) {
     activeProjects: projects.length,
   }
 
-  // Token usage by model
+  // Token usage by model (normalized + aggregated across providers)
   const modelMap = {}
   for (const s of sessions) {
     if (!s.model_id) continue
-    if (!modelMap[s.model_id]) {
-      modelMap[s.model_id] = { label: s.model_id, input: 0, output: 0, reasoning: 0, cache: 0 }
+    const normalized = normalizeModelName(s.model_id, s.model_provider)
+    const modelName = normalized.modelName
+    // When normalizeModelName couldn't resolve a provider prefix, mark as unknown
+    const provider = normalized.shortName === normalized.modelName
+      ? 'unknown'
+      : (normalized.shortName.split('/')[0] || 'unknown')
+
+    if (!modelMap[modelName]) {
+      modelMap[modelName] = {
+        label: modelName,
+        input: 0,
+        output: 0,
+        reasoning: 0,
+        cache: 0,
+        providers: [],
+      }
     }
-    modelMap[s.model_id].input += s.input_tokens
-    modelMap[s.model_id].output += s.output_tokens
-    modelMap[s.model_id].reasoning += s.reasoning_tokens
-    modelMap[s.model_id].cache += s.cache_tokens
+
+    modelMap[modelName].input += s.input_tokens
+    modelMap[modelName].output += s.output_tokens
+    modelMap[modelName].reasoning += s.reasoning_tokens
+    modelMap[modelName].cache += s.cache_tokens
+
+    // Accumulate per-provider breakdown
+    const existing = modelMap[modelName].providers.find((p) => p.provider === provider)
+    if (existing) {
+      existing.input += s.input_tokens
+      existing.output += s.output_tokens
+      existing.reasoning += s.reasoning_tokens
+      existing.cache += s.cache_tokens
+    } else {
+      modelMap[modelName].providers.push({
+        provider,
+        input: s.input_tokens,
+        output: s.output_tokens,
+        reasoning: s.reasoning_tokens,
+        cache: s.cache_tokens,
+      })
+    }
   }
   const byModel = Object.values(modelMap).sort((a, b) => (b.input + b.output) - (a.input + a.output))
 
@@ -491,6 +560,7 @@ function exportJsonFiles(paths) {
 
         for (const [modelId, modelData] of Object.entries(providerModels)) {
           if (!modelData || typeof modelData !== 'object') continue
+          if (modelData.status === 'deprecated') continue
 
           // Pricing from modelData.cost.{input,output,cache_read} (per-1M-tokens)
           // Convert to per-token by dividing by 1_000_000

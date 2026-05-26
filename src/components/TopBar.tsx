@@ -46,7 +46,7 @@ export default function TopBar({ onSync, quickStats }: TopBarProps) {
   }
 
   const tooltipText = quickStats
-    ? `Sessions: ${quickStats.totalSessions.toLocaleString()} · Tokens: ${formatNumber(quickStats.totalTokens)} · Cost: ${formatCost(quickStats.totalCost)}`
+    ? `Sessions: ${formatNumber(quickStats.totalSessions)} · Tokens: ${formatNumber(quickStats.totalTokens)} · Cost: ${formatCost(quickStats.totalCost)}`
     : 'Loading overview data…'
 
   return (
@@ -156,7 +156,7 @@ export default function TopBar({ onSync, quickStats }: TopBarProps) {
         }}
       >
         {quickStats
-          ? `${quickStats.totalSessions.toLocaleString()} · ${formatNumber(quickStats.totalTokens)} · ${formatCost(quickStats.totalCost)}`
+          ? `${formatNumber(quickStats.totalSessions)} · ${formatNumber(quickStats.totalTokens)} · ${formatCost(quickStats.totalCost)}`
           : '— · — · —'}
       </span>
 
@@ -175,7 +175,7 @@ export default function TopBar({ onSync, quickStats }: TopBarProps) {
         }}
       >
         {quickStats
-          ? quickStats.totalSessions.toLocaleString()
+          ? formatNumber(quickStats.totalSessions)
           : '—'}
       </span>
 

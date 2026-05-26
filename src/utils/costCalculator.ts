@@ -20,33 +20,38 @@ export function calculateCost(
 }
 
 export function formatCost(value: number): string {
-  if (!Number.isFinite(value) || value === 0) return '$0.00'
-  return `$${value.toFixed(2)}`
+  if (!Number.isFinite(value) || value === 0) return '$0'
+
+  if (value >= 1000) {
+    return '$' + formatNumber(value)
+  }
+
+  // value < 1000: format with 2dp, strip trailing zeros
+  const formatted = value.toFixed(2)
+  const stripped = formatted.endsWith('.00') ? formatted.slice(0, -3) : formatted
+  return '$' + stripped
 }
 
 /**
  * Formats a number with K/M/B suffix for compact display.
  * - < 1000: standard locale formatting (e.g., "999")
- * - >= 1000 and < 1000000: X.XK with trailing ".0" stripped (e.g., 1500 → "1.5K", 1000 → "1K")
- * - >= 1000000 and < 1000000000: X.XM with trailing ".0" stripped (e.g., 2500000 → "2.5M", 2000000 → "2M")
- * - >= 1000000000: X.XB with trailing ".0" stripped (e.g., 2500000000 → "2.5B", 1000000000 → "1B")
+ * - >= 1000 and < 1000000: X.XXK with trailing zeros stripped (e.g., 1500 → "1.5K", 1250 → "1.25K", 1000 → "1K")
+ * - >= 1000000 and < 1000000000: X.XXM with trailing zeros stripped (e.g., 2500000 → "2.5M", 1250000 → "1.25M")
+ * - >= 1000000000: X.XXB with trailing zeros stripped (e.g., 2500000000 → "2.5B", 1000000000 → "1B")
  */
 export function formatNumber(value: number): string {
   if (!Number.isFinite(value)) return '0'
   if (value < 1000) return Math.round(value).toLocaleString()
+
+  const strip = (n: string) => n.includes('.') ? n.replace(/\.?0+$/, '') : n
+
   if (value < 1000000) {
-    const k = value / 1000
-    const formatted = k.toFixed(1)
-    return formatted.endsWith('.0') ? formatted.slice(0, -2) + 'K' : formatted + 'K'
+    return strip((value / 1000).toFixed(2)) + 'K'
   }
   if (value < 1000000000) {
-    const m = value / 1000000
-    const formatted = m.toFixed(1)
-    return formatted.endsWith('.0') ? formatted.slice(0, -2) + 'M' : formatted + 'M'
+    return strip((value / 1000000).toFixed(2)) + 'M'
   }
-  const b = value / 1000000000
-  const formatted = b.toFixed(1)
-  return formatted.endsWith('.0') ? formatted.slice(0, -2) + 'B' : formatted + 'B'
+  return strip((value / 1000000000).toFixed(2)) + 'B'
 }
 
 /** ISO week pattern: YYYY-Www */

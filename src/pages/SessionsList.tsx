@@ -1,15 +1,16 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Search } from 'lucide-react'
-import { loadSessions, loadModels } from '../utils/dataLoader.ts'
-import { loadPricing, calculateCost, formatCost } from '../utils/costCalculator.ts'
+import { loadSessions, loadModels, loadProjects } from '../utils/dataLoader.ts'
+import { loadPricing, calculateCost, formatCost, formatNumber } from '../utils/costCalculator.ts'
 import DataTable from '../components/DataTable.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
-import type { Session } from '../types/index.ts'
+import type { Session, Project } from '../types/index.ts'
 
 export default function SessionsList() {
   const navigate = useNavigate()
   const [allSessions, setAllSessions] = useState<Session[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -28,7 +29,7 @@ export default function SessionsList() {
       try {
         setLoading(true)
         setError(null)
-        const [sessions, models] = await Promise.all([loadSessions(), loadModels()])
+        const [sessions, models, projectsData] = await Promise.all([loadSessions(), loadModels(), loadProjects()])
         const pricingMap = loadPricing(models)
 
         const sessionsWithCost = sessions.map((s) => {
@@ -49,6 +50,7 @@ export default function SessionsList() {
         })
 
         setAllSessions(sessionsWithCost)
+        setProjects(projectsData)
       } catch (err) {
         setError(err instanceof Error ? err.message : String(err))
       } finally {
@@ -59,21 +61,35 @@ export default function SessionsList() {
     fetch()
   }, [])
 
+  const projectNameMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const p of projects) {
+      map.set(p.id, p.name)
+    }
+    return map
+  }, [projects])
+
   const filtered = useMemo(() => {
     let result = [...allSessions]
 
     if (search) {
       const q = search.toLowerCase()
-      result = result.filter(
-        (s) =>
+      result = result.filter((s) => {
+        const projectName = s.project_id ? (projectNameMap.get(s.project_id) ?? s.project_id) : ''
+        return (
           s.title.toLowerCase().includes(q) ||
-          (s.project_id?.toLowerCase().includes(q) ?? false) ||
+          projectName.toLowerCase().includes(q) ||
           (s.model_id?.toLowerCase().includes(q) ?? false)
-      )
+        )
+      })
     }
 
     if (projectFilter) {
-      result = result.filter((s) => s.project_id?.toLowerCase().includes(projectFilter.toLowerCase()))
+      const pf = projectFilter.toLowerCase()
+      result = result.filter((s) => {
+        const projectName = s.project_id ? (projectNameMap.get(s.project_id) ?? '') : ''
+        return projectName.toLowerCase().includes(pf)
+      })
     }
 
     if (modelFilter) {
@@ -103,7 +119,7 @@ export default function SessionsList() {
     })
 
     return result
-  }, [allSessions, search, projectFilter, modelFilter, dateFrom, dateTo, sortBy, sortOrder])
+  }, [allSessions, search, projectFilter, modelFilter, dateFrom, dateTo, sortBy, sortOrder, projectNameMap])
 
   const paginated = useMemo(() => {
     return filtered.slice(page * pageSize, (page + 1) * pageSize)
@@ -212,9 +228,9 @@ export default function SessionsList() {
           <DataTable<Session>
             columns={[
               { key: 'title', header: 'Title' },
-              { key: 'project_id', header: 'Project', render: (s) => s.project_id ?? '—' },
+              { key: 'project_id', header: 'Project', render: (s) => projectNameMap.get(s.project_id ?? '') ?? s.project_id ?? '—' },
               { key: 'model_id', header: 'Model', render: (s) => s.model_id ?? '—' },
-              { key: 'total_tokens', header: 'Tokens', render: (s) => s.total_tokens.toLocaleString(), numeric: true },
+              { key: 'total_tokens', header: 'Tokens', render: (s) => formatNumber(s.total_tokens), numeric: true },
               { key: 'cost', header: 'Cost', render: (s) => (s.cost != null ? formatCost(s.cost) : '—'), numeric: true },
               { key: 'created_at', header: 'Date', render: (s) => new Date(s.created_at).toLocaleDateString() },
             ]}

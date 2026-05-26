@@ -109,7 +109,7 @@ export default function CostChart({
           </div>
         ) : (
           <ResponsiveContainer>
-            <LineChart data={data} margin={{ left: 0, right: 8, top: 5, bottom: 5 }}>
+            <LineChart data={data} margin={{ left: 8, right: 8, top: 5, bottom: 20 }}>
               <defs>
                 <linearGradient id="costAreaGrad" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="var(--accent)" stopOpacity={0.08} />
@@ -117,9 +117,24 @@ export default function CostChart({
                 </linearGradient>
               </defs>
               <CartesianGrid stroke="#21262d" strokeWidth={0.5} vertical={false} />
-              <XAxis dataKey="date" hide />
-              <YAxis hide />
-              <Tooltip content={CustomTooltip} />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(d: string) => formatDateTick(d, granularity)}
+                stroke="var(--text-secondary)"
+                fontSize={11}
+                tickLine={false}
+                axisLine={{ stroke: 'var(--border)' }}
+                dy={8}
+              />
+              <YAxis
+                tickFormatter={(v: number) => formatCost(v)}
+                stroke="var(--text-secondary)"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                width={60}
+              />
+              <Tooltip content={CustomTooltip} cursor={false} contentStyle={{ background: 'none', border: 'none', padding: 0 }} />
               <Area
                 type="monotone"
                 dataKey="cost"

@@ -183,6 +183,7 @@ export function computeTopModelsForBar(
   const items = tokenUsage.byModel.map((m) => ({
     label: m.label,
     totalTokens: m.input + m.output + m.reasoning + m.cache,
+    providers: m.providers,
   }))
 
   items.sort((a, b) => b.totalTokens - a.totalTokens)
@@ -190,10 +191,10 @@ export function computeTopModelsForBar(
 }
 
 export function computeKeyMetrics(
-  sessions: Session[],
+  _sessions: Session[],
   overview: OverviewStats,
   tokenUsage: TokenUsageData,
-  pricingMap: Map<string, Pricing>,
+  _pricingMap: Map<string, Pricing>,
   modelsCount: number,
   providersCount: number
 ): MetricCardData[] {
@@ -217,22 +218,8 @@ export function computeKeyMetrics(
   // Cache miss = non-cached input tokens (additive model: input and cache are separate columns)
   const totalCacheMissTokens = totalInputTokens
 
-  // Total cost computed from sessions
-  let totalCost = 0
-  for (const s of sessions) {
-    if (s.model_id && pricingMap.has(s.model_id)) {
-      const pricing = pricingMap.get(s.model_id)!
-      totalCost += calculateCost(
-        {
-          input: s.input_tokens,
-          output: s.output_tokens,
-          reasoning: s.reasoning_tokens,
-          cache: s.cache_tokens,
-        },
-        pricing
-      )
-    }
-  }
+  // Total cost from pre-computed overview (consistent with summary strip)
+  const totalCost = overview.totalCost
 
   const cards: MetricCardData[] = [
     {

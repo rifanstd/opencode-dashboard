@@ -59,36 +59,6 @@ The sync script auto-detects opencode paths on Windows. Override via `OPENCODE_D
 - **`noUnusedLocals` / `noUnusedParameters: true`** — unused imports/vars block `tsc -b`
 - **`noFallthroughCasesInSwitch: true`** — every case needs `break` or `return`
 
-## Framework stack
-
-| Concern | Choice |
-|---|---|
-| UI | React 19 + TypeScript |
-| Routing | React Router v7 (`BrowserRouter`) |
-| State | Zustand (`src/stores/appStore.ts`) |
-| Charts | Recharts |
-| DB (sync only) | sqlite3 (dev dep) |
-| Build | Vite 8 + `@vitejs/plugin-react` |
-| Lint | ESLint flat config (`defineConfig` + `globalIgnores`) |
-
-## Project structure
-
-```
-src/
-  main.tsx          Entry point
-  App.tsx           Router + routes
-  pages/            Route components (Overview=Sessions=Sessions:id=Providers=Models=Agents=Skills)
-  components/       Shared UI (Layout, charts, sidebar, etc.)
-  utils/            Data loaders, cost calc, sync handler, log parser
-  stores/           Zustand store (appStore.ts)
-  types/            All TypeScript interfaces
-  workers/          Empty (legacy)
-  hooks/            Empty
-scripts/
-  sync-opencode-data.js    Node.js script (runs outside build)
-public/data/               Generated JSON (gitignored)
-```
-
 ## Gotchas
 
 - **No test runner, CI, or env files** in this repo.

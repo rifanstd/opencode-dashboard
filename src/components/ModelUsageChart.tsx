@@ -16,6 +16,11 @@ interface ModelUsageChartProps {
 
 function CustomTooltip({ active, payload, label }: Record<string, unknown>) {
   if (!active || !payload || !Array.isArray(payload) || payload.length === 0) return null
+  const data = (payload[0] as Record<string, unknown>)?.payload as ModelUsageBarItem | undefined
+  const totalTokens = typeof payload[0]?.value === 'number'
+    ? (payload[0] as Record<string, unknown>).value as number
+    : 0
+
   return (
     <div
       style={{
@@ -30,13 +35,24 @@ function CustomTooltip({ active, payload, label }: Record<string, unknown>) {
     >
       <div style={{ color: 'var(--text-secondary)', marginBottom: 2 }}>{String(label ?? '')}</div>
       <div style={{ color: 'var(--accent)' }}>
-        {formatNumber(typeof payload[0]?.value === 'number' ? (payload[0] as Record<string, unknown>).value as number : 0)} tokens
+        {formatNumber(totalTokens)} tokens
       </div>
+      {data?.providers && data.providers.length > 1 && (
+        <div style={{ marginTop: 6, borderTop: '1px solid #30363d', paddingTop: 4 }}>
+          {data.providers.map((p) => (
+            <div key={p.provider} style={{ color: 'var(--text-muted)', fontSize: 11 }}>
+              {p.provider}: {formatNumber(p.input + p.output + p.reasoning + p.cache)} tokens
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
 
 export default function ModelUsageChart({ data }: ModelUsageChartProps) {
+  const hasLongLabels = data.some((d) => d.label.length > 15)
+
   return (
     <div>
       <div style={{ marginBottom: 12 }}>
@@ -68,11 +84,28 @@ export default function ModelUsageChart({ data }: ModelUsageChartProps) {
           </div>
         ) : (
           <ResponsiveContainer>
-            <BarChart data={data} margin={{ left: 0, right: 8, top: 5, bottom: 5 }}>
+            <BarChart data={data} margin={{ left: 8, right: 8, top: 5, bottom: hasLongLabels ? 40 : 20 }}>
               <CartesianGrid stroke="#21262d" strokeWidth={0.5} vertical={false} />
-              <XAxis dataKey="label" hide />
-              <YAxis hide />
-              <Tooltip content={CustomTooltip} />
+              <XAxis
+                dataKey="label"
+                stroke="var(--text-secondary)"
+                fontSize={11}
+                tickLine={false}
+                axisLine={{ stroke: 'var(--border)' }}
+                angle={hasLongLabels ? -45 : 0}
+                textAnchor={hasLongLabels ? 'end' : 'middle'}
+                height={hasLongLabels ? 60 : undefined}
+                dy={hasLongLabels ? -4 : 8}
+              />
+              <YAxis
+                tickFormatter={(v: number) => formatNumber(v)}
+                stroke="var(--text-secondary)"
+                fontSize={11}
+                tickLine={false}
+                axisLine={false}
+                width={60}
+              />
+              <Tooltip content={CustomTooltip} cursor={false} contentStyle={{ background: 'none', border: 'none', padding: 0 }} />
               <Bar
                 dataKey="totalTokens"
                 fill="var(--accent)"
