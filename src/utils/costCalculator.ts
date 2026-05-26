@@ -1,4 +1,4 @@
-import type { Granularity } from '../types/index.ts'
+import type { Granularity, ModelInfo } from '../types/index.ts'
 
 export interface Pricing {
   input: number
@@ -102,21 +102,19 @@ export function formatDateTick(dateStr: string, granularity: Granularity): strin
   }
 }
 
-export function loadPricing(modelsJson: unknown): Map<string, Pricing> {
+export function loadPricing(models: ModelInfo[]): Map<string, Pricing> {
   const map = new Map<string, Pricing>()
-  if (!modelsJson || typeof modelsJson !== 'object') return map
+  if (!Array.isArray(models)) return map
 
-  const models = modelsJson as Record<string, unknown>
-  for (const [key, model] of Object.entries(models)) {
+  for (const model of models) {
     if (!model || typeof model !== 'object') continue
-    const m = model as Record<string, unknown>
     const pricing: Pricing = {
-      input: Number(m.input_price ?? m.inputPrice ?? 0),
-      output: Number(m.output_price ?? m.outputPrice ?? 0),
-      reasoning: m.reasoning_price != null ? Number(m.reasoning_price) : undefined,
-      cache: m.cache_price != null ? Number(m.cache_price) : undefined,
+      input: Number(model.input_price ?? 0),
+      output: Number(model.output_price ?? 0),
+      reasoning: model.reasoning_price != null ? Number(model.reasoning_price) : undefined,
+      cache: model.cache_price != null ? Number(model.cache_price) : undefined,
     }
-    map.set(key, pricing)
+    map.set(model.id, pricing)
   }
   return map
 }

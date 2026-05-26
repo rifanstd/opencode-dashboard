@@ -3,6 +3,7 @@ export interface Session {
   title: string
   project_id: string | null
   model_id: string | null
+  model_provider: string | null
   created_at: string
   updated_at: string
   input_tokens: number
