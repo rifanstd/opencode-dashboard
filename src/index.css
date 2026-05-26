@@ -231,3 +231,46 @@ progress::-moz-progress-bar {
     scroll-behavior: auto;
   }
 }
+
+.detail-cards-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1023px) {
+  .detail-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 639px) {
+  .detail-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.detail-card {
+  background: var(--bg-secondary);
+  border-radius: 6px;
+  padding: 20px;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.detail-card-label {
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+
+.detail-card-value {
+  font-family: var(--sans);
+  font-size: 13px;
+  color: var(--text-primary);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}

@@ -92,20 +92,7 @@ const cardStyle: React.CSSProperties = {
   padding: 20,
 }
 
-const cardLabelStyle: React.CSSProperties = {
-  fontFamily: 'var(--sans)',
-  fontSize: 11,
-  color: 'var(--text-muted)',
-  textTransform: 'uppercase',
-  letterSpacing: '0.5px',
-  marginBottom: 4,
-}
 
-const cardValueStyle: React.CSSProperties = {
-  fontFamily: 'var(--sans)',
-  fontSize: 13,
-  color: 'var(--text-primary)',
-}
 
 interface TokenBar {
   label: string
@@ -267,29 +254,22 @@ export default function SessionDetail() {
           </div>
 
           {/* Detail Cards */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
-              gap: 12,
-              marginBottom: 24,
-            }}
-          >
-            <div style={cardStyle}>
-              <div style={cardLabelStyle}>Model</div>
-              <div style={cardValueStyle}>{session.model_id ?? '—'}</div>
+          <div className="detail-cards-grid" style={{ marginBottom: 24 }}>
+            <div className="detail-card">
+              <div className="detail-card-label">Model</div>
+              <div className="detail-card-value">{shortenModelName(session.model_id, session.model_provider)}</div>
             </div>
-            <div style={cardStyle}>
-              <div style={cardLabelStyle}>Project</div>
-              <div style={cardValueStyle}>{projectName ?? '—'}</div>
+            <div className="detail-card">
+              <div className="detail-card-label">Project</div>
+              <div className="detail-card-value">{projectName ?? '—'}</div>
             </div>
-            <div style={cardStyle}>
-              <div style={cardLabelStyle}>Date</div>
-              <div style={cardValueStyle}>{new Date(session.created_at).toLocaleString()}</div>
+            <div className="detail-card">
+              <div className="detail-card-label">Date</div>
+              <div className="detail-card-value">{new Date(session.created_at).toLocaleString()}</div>
             </div>
-            <div style={cardStyle}>
-              <div style={cardLabelStyle}>Cost</div>
-              <div style={cardValueStyle}>{session.cost != null ? formatCost(session.cost) : '—'}</div>
+            <div className="detail-card">
+              <div className="detail-card-label">Cost</div>
+              <div className="detail-card-value">{session.cost != null ? formatCost(session.cost) : '—'}</div>
             </div>
           </div>
 
