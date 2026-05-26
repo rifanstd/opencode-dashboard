@@ -17,10 +17,48 @@ export default function SessionsList() {
   const [search, setSearch] = useState('')
   const [dateFrom, setDateFrom] = useState('')
   const [dateTo, setDateTo] = useState('')
+  type QuickFilter = 'today' | 'week' | 'month' | 'year'
+  const [quickFilter, setQuickFilter] = useState<QuickFilter | null>(null)
   const [sortBy, setSortBy] = useState('created_at')
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [page, setPage] = useState(0)
   const pageSize = 50
+
+  function getQuickFilterRange(filter: QuickFilter): { from: string; to: string } {
+    const now = new Date()
+    const iso = (d: Date) => d.toISOString().slice(0, 10)
+
+    switch (filter) {
+      case 'today':
+        return { from: iso(now), to: iso(now) }
+      case 'week': {
+        const day = now.getDay() || 7
+        const monday = new Date(now)
+        monday.setDate(now.getDate() - day + 1)
+        const sunday = new Date(monday)
+        sunday.setDate(monday.getDate() + 6)
+        return { from: iso(monday), to: iso(sunday) }
+      }
+      case 'month': {
+        const first = new Date(now.getFullYear(), now.getMonth(), 1)
+        const last = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        return { from: iso(first), to: iso(last) }
+      }
+      case 'year': {
+        const first = new Date(now.getFullYear(), 0, 1)
+        const last = new Date(now.getFullYear(), 11, 31)
+        return { from: iso(first), to: iso(last) }
+      }
+    }
+  }
+
+  const applyQuickFilter = (filter: QuickFilter) => {
+    const range = getQuickFilterRange(filter)
+    setQuickFilter(filter)
+    setDateFrom(range.from)
+    setDateTo(range.to)
+    setPage(0)
+  }
 
   useEffect(() => {
     async function fetch() {
@@ -151,25 +189,10 @@ export default function SessionsList() {
       </h1>
       {error && <ErrorMessage message={error} />}
 
-      <div
-        style={{
-          display: 'flex',
-          gap: 8,
-          flexWrap: 'wrap',
-          marginBottom: 20,
-          alignItems: 'center',
-        }}
-      >
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20, alignItems: 'center' }}>
+        {/* Search input */}
         <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-          <Search
-            size={14}
-            style={{
-              position: 'absolute',
-              left: 8,
-              color: 'var(--text-muted)',
-              pointerEvents: 'none',
-            }}
-          />
+          <Search size={14} style={{ position: 'absolute', left: 8, color: 'var(--text-muted)', pointerEvents: 'none' }} />
           <input
             type="text"
             placeholder="Search…"
@@ -178,18 +201,52 @@ export default function SessionsList() {
             style={{ ...filterInputStyle, minWidth: 200, paddingLeft: 28 }}
           />
         </div>
-        <input
-          type="date"
-          value={dateFrom}
-          onChange={(e) => { setDateFrom(e.target.value); setPage(0) }}
-          style={filterInputStyle}
-        />
-        <input
-          type="date"
-          value={dateTo}
-          onChange={(e) => { setDateTo(e.target.value); setPage(0) }}
-          style={filterInputStyle}
-        />
+
+        {/* Quick filters */}
+        {(['today', 'week', 'month', 'year'] as QuickFilter[]).map((qf) => {
+          const active = quickFilter === qf
+          return (
+            <button
+              key={qf}
+              type="button"
+              onClick={() => applyQuickFilter(qf)}
+              style={{
+                fontFamily: 'var(--sans)',
+                fontSize: 12,
+                height: 32,
+                padding: '0 12px',
+                borderRadius: 4,
+                border: '1px solid var(--border)',
+                background: active ? 'var(--accent-dim)' : 'var(--bg-tertiary)',
+                color: active ? 'var(--accent)' : 'var(--text-secondary)',
+                cursor: 'pointer',
+                textTransform: 'capitalize',
+              }}
+            >
+              {qf === 'week' ? 'This Week' : qf === 'month' ? 'This Month' : qf === 'year' ? 'This Year' : 'Today'}
+            </button>
+          )
+        })}
+
+        {/* Date pickers with labels */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text-muted)' }}>
+          From
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={(e) => { setDateFrom(e.target.value); setQuickFilter(null); setPage(0) }}
+            style={filterInputStyle}
+          />
+        </label>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontFamily: 'var(--sans)', fontSize: 12, color: 'var(--text-muted)' }}>
+          To
+          <input
+            type="date"
+            value={dateTo}
+            onChange={(e) => { setDateTo(e.target.value); setQuickFilter(null); setPage(0) }}
+            style={filterInputStyle}
+          />
+        </label>
       </div>
 
       {loading ? (
