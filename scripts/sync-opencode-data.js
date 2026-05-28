@@ -151,22 +151,6 @@ function normalizeModelName(modelId, providerHint) {
   return { shortName: modelId, modelName: modelId }
 }
 
-function readLogFiles(dirPath) {
-  const results = []
-  try {
-    const entries = fs.readdirSync(dirPath, { withFileTypes: true })
-    for (const entry of entries) {
-      if (entry.isFile() && entry.name.endsWith('.log')) {
-        const content = fs.readFileSync(path.join(dirPath, entry.name), 'utf-8')
-        results.push({ name: entry.name, content })
-      }
-    }
-  } catch {
-    // ignore
-  }
-  return results
-}
-
 /**
  * Parse simple YAML frontmatter from markdown text.
  * Only handles top-level scalar key: value pairs.
@@ -529,7 +513,6 @@ function exportJsonFiles(paths) {
   const models = []
   const agents = []
   const skills = []
-  const logs = []
 
   // Providers from auth.json
   if (paths.local) {
@@ -692,22 +675,7 @@ function exportJsonFiles(paths) {
     }
   }
 
-  // 1. Project-local paths (CWD-relative)
-  const cwd = process.cwd()
-  const localBases = [
-    { dir: path.join(cwd, '.opencode', 'skills'), label: 'project/.opencode' },
-    { dir: path.join(cwd, '.claude', 'skills'), label: 'project/.claude' },
-    { dir: path.join(cwd, '.agents', 'skills'), label: 'project/.agents' },
-  ]
-  for (const { dir, label } of localBases) {
-    const found = scanSkillDirectories(dir, label)
-    if (found.length) {
-      console.log(`  Found ${found.length} skill(s) in ${label}`)
-      addSkillsToMap(found, label)
-    }
-  }
-
-  // 2. Global paths (home-relative)
+  // Global paths (home-relative)
   if (home) {
     const globalBases = [
       { dir: path.join(home, '.config', 'opencode', 'skills'), label: 'global/.config/opencode' },
@@ -723,31 +691,7 @@ function exportJsonFiles(paths) {
     }
   }
 
-  // 3. Supplementary metadata from skills-lock.json (fixes nested "skills" bug)
-  const lockFileSources = new Map()
-  if (paths.config) {
-    const lockPath = path.join(paths.config, 'skills-lock.json')
-    const lockJson = readJsonSafe(lockPath)
-    if (lockJson && typeof lockJson === 'object' && lockJson.skills && typeof lockJson.skills === 'object') {
-      for (const [key, value] of Object.entries(lockJson.skills)) {
-        if (value && typeof value === 'object') {
-          lockFileSources.set(key, value.source ?? value.origin ?? null)
-        }
-      }
-    }
-  }
-  // Also check project-root skills-lock.json
-  const projectLockPath = path.join(cwd, 'skills-lock.json')
-  const projectLockJson = readJsonSafe(projectLockPath)
-  if (projectLockJson && typeof projectLockJson === 'object' && projectLockJson.skills && typeof projectLockJson.skills === 'object') {
-    for (const [key, value] of Object.entries(projectLockJson.skills)) {
-      if (value && typeof value === 'object') {
-        lockFileSources.set(key, value.source ?? value.origin ?? null)
-      }
-    }
-  }
-
-  // 4. Build final skills array in UI-compatible shape
+  // Build final skills array in UI-compatible shape
   for (const [name, data] of skillMap) {
     skills.push({
       name,
@@ -762,45 +706,7 @@ function exportJsonFiles(paths) {
     console.log(`  Total unique skills exported: ${skills.length}`)
   }
 
-  // Logs from log/*.log
-  if (paths.local) {
-    const logDir = path.join(paths.local, 'log')
-    const logFiles = readLogFiles(logDir)
-    for (const file of logFiles) {
-      const lines = file.content.split('\n')
-      for (const line of lines) {
-        if (!line.trim()) continue
-        const match = line.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?)\s+(INFO|WARN|ERROR|DEBUG)\s+(.*)$/i)
-        if (match) {
-          logs.push({
-            timestamp: match[1],
-            level: match[2].toUpperCase(),
-            message: match[3].trim(),
-            source: file.name,
-          })
-          continue
-        }
-        const simpleMatch = line.match(/^\[(INFO|WARN|ERROR|DEBUG)\]\s+(.*)$/i)
-        if (simpleMatch) {
-          logs.push({
-            timestamp: new Date().toISOString(),
-            level: simpleMatch[1].toUpperCase(),
-            message: simpleMatch[2].trim(),
-            source: file.name,
-          })
-          continue
-        }
-        logs.push({
-          timestamp: new Date().toISOString(),
-          level: 'INFO',
-          message: line.trim(),
-          source: file.name,
-        })
-      }
-    }
-  }
-
-  return { providers, models, agents, skills, logs }
+  return { providers, models, agents, skills }
 }
 
 async function main() {
@@ -849,8 +755,7 @@ async function main() {
   fs.writeFileSync(path.join(DATA_DIR, 'models.json'), JSON.stringify(auxData.models))
   fs.writeFileSync(path.join(DATA_DIR, 'agents.json'), JSON.stringify(auxData.agents))
   fs.writeFileSync(path.join(DATA_DIR, 'skills.json'), JSON.stringify(auxData.skills))
-  fs.writeFileSync(path.join(DATA_DIR, 'logs.json'), JSON.stringify(auxData.logs))
-  console.log(`  Exported ${auxData.providers.length} providers, ${auxData.models.length} models, ${auxData.agents.length} agents, ${auxData.skills.length} skills, ${auxData.logs.length} log entries`)
+  console.log(`  Exported ${auxData.providers.length} providers, ${auxData.models.length} models, ${auxData.agents.length} agents, ${auxData.skills.length} skills`)
 
   console.log('\nSync complete. Data written to public/data/')
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { Search } from 'lucide-react'
+import { Search, FolderOpen } from 'lucide-react'
 import { loadSkills } from '../utils/dataLoader.ts'
 import DataTable from '../components/DataTable.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
@@ -60,6 +60,83 @@ export default function Skills() {
       >
         Skills
       </h1>
+
+      {/* Data Source Info */}
+      <div
+        style={{
+          background: 'var(--bg-secondary)',
+          border: '1px solid var(--border)',
+          borderLeft: '3px solid var(--accent)',
+          borderRadius: 6,
+          padding: '16px 20px',
+          marginBottom: 24,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 12,
+          }}
+        >
+          <FolderOpen size={14} style={{ color: 'var(--accent)' }} />
+          <span
+            style={{
+              fontFamily: 'var(--sans)',
+              fontSize: 12,
+              fontWeight: 500,
+              color: 'var(--text-secondary)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.5px',
+            }}
+          >
+            Data Sources
+          </span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {[
+            { label: 'Global config', path: '~/.config/opencode/skills/<name>/SKILL.md' },
+            { label: 'Global Claude-compatible', path: '~/.claude/skills/<name>/SKILL.md' },
+            { label: 'Global agent-compatible', path: '~/.agents/skills/<name>/SKILL.md' },
+          ].map((source) => (
+            <div
+              key={source.label}
+              style={{
+                display: 'flex',
+                alignItems: 'baseline',
+                gap: 12,
+              }}
+            >
+              <span
+                style={{
+                  fontFamily: 'var(--sans)',
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                  minWidth: 140,
+                  flexShrink: 0,
+                }}
+              >
+                {source.label}
+              </span>
+              <code
+                style={{
+                  fontFamily: 'var(--mono)',
+                  fontSize: 12,
+                  color: 'var(--text-primary)',
+                  background: 'var(--bg-tertiary)',
+                  padding: '2px 8px',
+                  borderRadius: 4,
+                  wordBreak: 'break-all',
+                }}
+              >
+                {source.path}
+              </code>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {error && <ErrorMessage message={error} />}
       {skills.length === 0 && !error && (
         <div style={{ textAlign: 'center', padding: 40, fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--text-muted)' }}>

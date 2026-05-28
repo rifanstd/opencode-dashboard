@@ -7,7 +7,6 @@ import type {
   ProviderInfo,
   AgentInfo,
   SkillInfo,
-  LogEntry,
   OverviewStats,
 } from '../types/index.ts'
 
@@ -112,10 +111,6 @@ export function loadAgents(): Promise<AgentInfo[]> {
 
 export function loadSkills(): Promise<SkillInfo[]> {
   return loadJson<SkillInfo[]>('/data/skills.json')
-}
-
-export function loadLogs(): Promise<LogEntry[]> {
-  return loadJson<LogEntry[]>('/data/logs.json')
 }
 
 export function loadOverviewStats(): Promise<OverviewStats> {

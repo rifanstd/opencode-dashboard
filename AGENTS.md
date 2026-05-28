@@ -16,7 +16,7 @@ npm run sync     # Export opencode data → public/data/*.json
 
 **Client-side dashboard** — all data comes from static JSON in `public/data/`. No backend, no File System Access API.
 
-1. `scripts/sync-opencode-data.js` reads the local opencode SQLite DB + config, exports 11 JSON files to `public/data/`
+1. `scripts/sync-opencode-data.js` reads the local opencode SQLite DB + config, exports 10 JSON files to `public/data/`
 2. Pages load data on-demand via `src/utils/dataLoader.ts` → `fetch('/data/*.json')`
 3. "Sync" button in the UI → `fetch('/api/sync')` (Vite middleware spawns `node scripts/sync-opencode-data.js`) → page reloads
 
@@ -37,7 +37,7 @@ npm run sync   # Required before build
 npm run build
 ```
 
-## Sync output (11 JSON files)
+## Sync output (10 JSON files)
 
 The sync script produces exactly these files in `public/data/`:
 
@@ -46,8 +46,7 @@ The sync script produces exactly these files in `public/data/`:
 - `providers.json` — from `auth.json` (local + config fallback)
 - `models.json` — from `models.json` in cache dir
 - `agents.json` — from `agents/*.md` in config dir
-- `skills.json` — from `skills-lock.json` in config dir
-- `logs.json` — from `log/*.log` in local dir
+- `skills.json` — from scanned `SKILL.md` files in global directories
 
 The sync script auto-detects opencode paths on Windows. Override via `OPENCODE_DATA_PATH` env var or `--local`, `--cache`, `--config` CLI args.
 
@@ -112,21 +111,13 @@ The sync script auto-detects opencode paths on Windows. Override via `OPENCODE_D
 - **Fields**: `name`, `description`, `filename`
 - **Notes**: `name` is extracted from the first `# Heading` line. `description` is the first non-empty, non-heading, non-code-block line. Only files ending in `.md` are read.
 
-### 10. `skills.json` — Scanned `SKILL.md` files + `skills-lock.json`
-- **Primary source**: Scanned directories containing `SKILL.md` files:
-  - Project-local: `CWD/.opencode/skills/`, `CWD/.claude/skills/`, `CWD/.agents/skills/`
-  - Global: `~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/`
-- **Supplementary metadata**: `skills-lock.json` (both in `config` path and project root)
+### 10. `skills.json` — Scanned `SKILL.md` files in global directories
+- **Primary source**: Scanned global directories containing `SKILL.md` files:
+  - `~/.config/opencode/skills/<name>/SKILL.md`
+  - `~/.claude/skills/<name>/SKILL.md`
+  - `~/.agents/skills/<name>/SKILL.md`
 - **Fields**: `name`, `description`, `path`
-- **Notes**: Skill metadata is parsed from YAML frontmatter in each `SKILL.md` (keys: `name`, `description`). If the same skill name exists in multiple locations, the first one found wins. `skills-lock.json` is only used for source/origin metadata, not for the list of skills itself.
-
-### 11. `logs.json` — `local/log/*.log`
-- **Source**: `.log` files inside the `log` subdirectory of the detected `local` opencode path
-- **Fields**: `timestamp`, `level` (`INFO`/`WARN`/`ERROR`/`DEBUG`), `message`, `source` (filename)
-- **Notes**: The sync script attempts multiple parsing strategies:
-  1. `YYYY-MM-DDTHH:mm:ss... LEVEL message` (with ISO timestamp)
-  2. `[LEVEL] message` (falls back to current timestamp)
-  3. Any other line → `INFO` level with the full line as message
+- **Notes**: Skill metadata is parsed from YAML frontmatter in each `SKILL.md` (keys: `name`, `description`). If the same skill name exists in multiple locations, the first one found wins.
 
 ## Global Data Sources (Dashboard-Level)
 
@@ -167,16 +158,9 @@ The following describes where each type of data displayed in the dashboard origi
 - **What it contains**: Agent name, description, and filename.
 
 ### Skills
-- **Origin**: Two sources:
-  1. **Primary**: Scanned directories containing `SKILL.md` files (project-local and global paths).
-  2. **Supplementary**: `skills-lock.json` for metadata about source/origin.
-- **How it is read**: The sync script scans directories, reads `SKILL.md` files, and parses YAML frontmatter (`name`, `description`). The dashboard displays the name and description.
+- **Origin**: Scanned global directories containing `SKILL.md` files.
+- **How it is read**: The sync script scans global directories (`~/.config/opencode/skills/`, `~/.claude/skills/`, `~/.agents/skills/`), reads `SKILL.md` files, and parses YAML frontmatter (`name`, `description`). The dashboard displays the name and description.
 - **What it contains**: Skill name, description, and path.
-
-### Logs
-- **Origin**: `.log` files in the `log` subdirectory of the `local` directory.
-- **How it is read**: The sync script reads each `.log` file line by line and attempts to parse timestamps and log levels.
-- **What it contains**: Log timestamp, level (`INFO`/`WARN`/`ERROR`/`DEBUG`), message, and source filename.
 
 ## TypeScript strictness
 

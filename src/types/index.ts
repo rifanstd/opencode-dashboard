@@ -77,13 +77,6 @@ export interface SkillInfo {
   path: string
 }
 
-export interface LogEntry {
-  timestamp: string
-  level: 'INFO' | 'WARN' | 'ERROR' | 'DEBUG'
-  message: string
-  source: string
-}
-
 export interface TokenBreakdown {
   input: number
   output: number
