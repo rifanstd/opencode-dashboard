@@ -37,3 +37,8 @@ auth.json
 *.njsproj
 *.sln
 *.sw?
+
+# Opencode internal files
+.knowledge/
+prompt.md
+skills-lock.json

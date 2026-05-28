@@ -1,73 +1,160 @@
-# React + TypeScript + Vite
+# Opencode Dashboard
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+A client-side dashboard for visualizing your [opencode](https://github.com/opencode-ai/opencode) usage data — sessions, messages, tokens, costs, providers, models, agents, and skills.
 
-Currently, two official plugins are available:
+> **All data is local.** No backend server. No cloud upload. Your data stays on your machine.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## Features
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **Overview** — Total sessions, tokens, costs, and most-used model at a glance
+- **Sessions** — Browse all sessions, filter by project or agent, view details
+- **Token Usage** — Interactive charts by model, provider, project, and time (day/week/month/year)
+- **Providers & Models** — View configured providers, model pricing, and capabilities
+- **Agents** — List and inspect your custom opencode agents with usage stats
+- **Skills** — Discover installed skills from your global opencode directories
+- **One-click Sync** — Pull fresh data from your local opencode SQLite database
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## Tech Stack
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+- [React](https://react.dev/) 19 + [TypeScript](https://www.typescriptlang.org/) 5
+- [Vite](https://vitejs.dev/) 8
+- [Recharts](https://recharts.org/) for data visualization
+- [Motion](https://motion.dev/) for page transitions
+- [Zustand](https://github.com/pmndrs/zustand) for state management
+- [Tailwind CSS](https://tailwindcss.com/) (via Vite plugin)
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+---
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## Prerequisites
+
+- [Node.js](https://nodejs.org/) 18+ (LTS recommended)
+- [npm](https://www.npmjs.com/) (or pnpm / yarn)
+- **opencode installed locally** — the dashboard reads from your local opencode data files
+
+---
+
+## Installation
+
+```bash
+git clone https://github.com/your-username/opencode-dashboard.git
+cd opencode-dashboard
+npm install
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+### First-time setup
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+Before running the dashboard, you must generate the static JSON data files from your local opencode database:
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+npm run sync
 ```
+
+This creates `public/data/*.json` — all the data the dashboard needs.  
+> ⚠️ This folder is `.gitignore`d and **must never be committed** — it contains your personal data and API keys.
+
+Then start the dev server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:5173](http://localhost:5173) in your browser.
+
+---
+
+## Data Architecture
+
+The dashboard is **100% client-side**. All data comes from static JSON files in `public/data/`:
+
+| File | Source |
+|------|--------|
+| `sessions.json` | `opencode.db` (SQLite) |
+| `messages.json` | `opencode.db` (SQLite) |
+| `parts.json` | `opencode.db` (SQLite) |
+| `projects.json` | `opencode.db` (SQLite) |
+| `overview.json` | Computed aggregates from sessions |
+| `token-usage.json` | Computed aggregates from sessions |
+| `providers.json` | `auth.json` (local + config fallback) |
+| `models.json` | `cache/models.json` |
+| `agents.json` | `config/agents/*.md` |
+| `skills.json` | Scanned `SKILL.md` files in global directories |
+
+The sync script auto-detects opencode paths on Windows/macOS/Linux. Override with:
+
+```bash
+npm run sync -- --local <path> --cache <path> --config <path>
+# or
+OPENCODE_DATA_PATH=/path/to/opencode npm run sync
+```
+
+---
+
+## Available Scripts
+
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start Vite dev server with live reload + sync API endpoint |
+| `npm run build` | Type-check and build for production |
+| `npm run preview` | Preview the production build locally |
+| `npm run sync` | Export opencode data → `public/data/*.json` |
+| `npm run lint` | Run ESLint across the entire project |
+
+> **Build order matters:** `tsc -b` runs first; type errors block the Vite build.
+
+---
+
+## Project Structure
+
+```
+├── public/
+│   ├── data/              # Generated JSON files (ignored by git)
+│   └── fonts/             # Geist & JetBrains Mono
+├── scripts/
+│   └── sync-opencode-data.js   # Data export script
+├── src/
+│   ├── components/        # Reusable UI components
+│   ├── pages/             # Route-level pages
+│   ├── stores/            # Zustand stores
+│   ├── utils/             # Data loaders, cost calculator, helpers
+│   └── types/             # TypeScript type definitions
+├── vite.config.ts         # Vite config + dev-only /api/sync endpoint
+├── tsconfig.json          # TypeScript solution config
+└── eslint.config.js      # ESLint flat config
+```
+
+---
+
+## Security & Privacy
+
+- **No data leaves your machine.** The dashboard is a static client-side app.
+- **Never commit `public/data/`** — it contains your personal sessions, messages, and API keys.
+- The sync script reads from your local opencode files only.
+- Production builds serve static files only; the `/api/sync` endpoint works only in dev mode.
+
+---
+
+## Contributing
+
+Contributions are welcome! Please open an issue or pull request.
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feat/my-feature`)
+3. Make your changes
+4. Ensure `npm run lint` and `npm run build` pass
+5. Submit a pull request
+
+---
+
+## License
+
+MIT License — see [LICENSE](./LICENSE) for details.
+
+---
+
+## Acknowledgments
+
+Built for the [opencode](https://github.com/opencode-ai/opencode) community.
