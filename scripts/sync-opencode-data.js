@@ -265,6 +265,7 @@ async function exportDatabase(dbPath) {
       cache_tokens: (s.tokens_cache_read ?? 0),
       total_tokens: (s.tokens_input ?? 0) + (s.tokens_output ?? 0) + (s.tokens_reasoning ?? 0) + (s.tokens_cache_read ?? 0),
       cost: s.cost ?? null,
+      agent: s.agent ?? null,
     }
   })
 
@@ -677,10 +678,13 @@ function exportJsonFiles(paths, sessions = []) {
     }
   }
 
-  // Compute agent usage from session titles
+  // Compute agent usage from session agent field, fallback to title regex
+  const agentFilenameMap = new Map()
   const agentRegexMap = new Map()
   for (const agent of agents) {
     const baseName = agent.filename.replace(/\.md$/, '')
+    agentFilenameMap.set(baseName, agent)
+
     const names = [baseName]
     if (agent.name && agent.name !== baseName) {
       names.push(agent.name)
@@ -702,10 +706,11 @@ function exportJsonFiles(paths, sessions = []) {
   }
 
   for (const session of sessions) {
-    const title = session.title ?? ''
-    for (const agent of agents) {
-      const regex = agentRegexMap.get(agent.filename)
-      if (regex && regex.test(title)) {
+    let matched = false
+    // First try matching by session.agent field (most accurate)
+    if (session.agent) {
+      const agent = agentFilenameMap.get(session.agent)
+      if (agent) {
         const u = agent.usage
         u.sessionCount++
         u.inputTokens += session.input_tokens ?? 0
@@ -720,7 +725,31 @@ function exportJsonFiles(paths, sessions = []) {
             u.lastUsed = session.created_at
           }
         }
-        break // A session title should match at most one agent
+        matched = true
+      }
+    }
+    // Fallback to title regex for backward compatibility
+    if (!matched) {
+      const title = session.title ?? ''
+      for (const agent of agents) {
+        const regex = agentRegexMap.get(agent.filename)
+        if (regex && regex.test(title)) {
+          const u = agent.usage
+          u.sessionCount++
+          u.inputTokens += session.input_tokens ?? 0
+          u.outputTokens += session.output_tokens ?? 0
+          u.reasoningTokens += session.reasoning_tokens ?? 0
+          u.cacheTokens += session.cache_tokens ?? 0
+          u.totalTokens += session.total_tokens ?? 0
+          u.totalCost += session.cost ?? 0
+          const sessionDate = session.created_at ? new Date(session.created_at) : null
+          if (sessionDate && !isNaN(sessionDate.getTime())) {
+            if (!u.lastUsed || sessionDate > new Date(u.lastUsed)) {
+              u.lastUsed = session.created_at
+            }
+          }
+          break // A session title should match at most one agent
+        }
       }
     }
   }

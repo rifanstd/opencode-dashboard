@@ -12,6 +12,7 @@ export interface Session {
   cache_tokens: number
   total_tokens: number
   cost: number | null
+  agent: string | null
 }
 
 export interface Project {
