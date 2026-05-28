@@ -2,6 +2,7 @@ import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import sqlite3 from 'sqlite3'
+import yaml from 'js-yaml'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
@@ -151,37 +152,31 @@ function normalizeModelName(modelId, providerHint) {
   return { shortName: modelId, modelName: modelId }
 }
 
-/**
- * Parse simple YAML frontmatter from markdown text.
- * Only handles top-level scalar key: value pairs.
- * Returns a plain object of metadata.
- */
 function parseYamlFrontmatter(text) {
-  const result = {}
-  if (!text || typeof text !== 'string') return result
-
+  if (!text || typeof text !== 'string') return {}
   const trimmed = text.trimStart()
-  if (!trimmed.startsWith('---')) return result
-
+  if (!trimmed.startsWith('---')) return {}
   const endIdx = trimmed.indexOf('\n---', 4)
-  if (endIdx === -1) return result
-
+  if (endIdx === -1) return {}
   const block = trimmed.slice(3, endIdx).trim()
-  const lines = block.split('\n')
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim()
-    if (!line || line.startsWith('#')) continue
-    const colonIdx = line.indexOf(':')
-    if (colonIdx === -1) continue
-    const key = line.slice(0, colonIdx).trim()
-    const value = line.slice(colonIdx + 1).trim()
-    if (key) {
-      result[key] = value
-    }
+  try {
+    return yaml.load(block) || {}
+  } catch {
+    return {}
   }
+}
 
-  return result
+function extractContentWithoutFrontmatter(text) {
+  if (!text || typeof text !== 'string') return ''
+  const trimmed = text.trimStart()
+  if (!trimmed.startsWith('---')) return trimmed
+  const endIdx = trimmed.indexOf('\n---', 4)
+  if (endIdx === -1) return trimmed
+  return trimmed.slice(endIdx + 4).trim()
+}
+
+function escapeRegex(str) {
+  return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 /**
@@ -508,7 +503,7 @@ async function exportDatabase(dbPath) {
   }
 }
 
-function exportJsonFiles(paths) {
+function exportJsonFiles(paths, sessions = []) {
   const providers = []
   const models = []
   const agents = []
@@ -637,28 +632,96 @@ function exportJsonFiles(paths) {
     const agentFiles = readTextFiles(agentsDir, '.md')
     for (const file of agentFiles) {
       const lines = file.content.split('\n')
-      let name = 'Unnamed Agent'
+      const filename = file.name
+      const baseName = filename.replace(/\.md$/, '')
+      
+      // Use filename as the canonical agent name (capitalized)
+      const name = baseName.charAt(0).toUpperCase() + baseName.slice(1)
+
+      const frontmatter = parseYamlFrontmatter(file.content)
+
       let description = ''
-      for (const line of lines) {
-        const match = line.match(/^#\s+(.+)$/)
-        if (match) {
-          name = match[1].trim()
+      if (frontmatter.description) {
+        description = String(frontmatter.description)
+      } else {
+        let inCodeBlock = false
+        for (const line of lines) {
+          if (line.trim().startsWith('```')) {
+            inCodeBlock = !inCodeBlock
+            continue
+          }
+          if (inCodeBlock) continue
+          if (line.trim().startsWith('#')) continue
+          if (line.trim() === '') continue
+          description = line.trim()
           break
         }
       }
-      let inCodeBlock = false
-      for (const line of lines) {
-        if (line.trim().startsWith('```')) {
-          inCodeBlock = !inCodeBlock
-          continue
+
+      const permissionBlock = frontmatter.permission || frontmatter.permissions || {}
+
+      agents.push({
+        name,
+        description,
+        filename,
+        mode: frontmatter.mode ?? null,
+        hidden: frontmatter.hidden === true || frontmatter.hidden === 'true',
+        temperature: frontmatter.temperature != null ? Number(frontmatter.temperature) : null,
+        permissions: {
+          edit: permissionBlock.edit ?? null,
+          bash: permissionBlock.bash ?? null,
+          glob: permissionBlock.glob ?? null,
+        },
+        content: extractContentWithoutFrontmatter(file.content),
+      })
+    }
+  }
+
+  // Compute agent usage from session titles
+  const agentRegexMap = new Map()
+  for (const agent of agents) {
+    const baseName = agent.filename.replace(/\.md$/, '')
+    const names = [baseName]
+    if (agent.name && agent.name !== baseName) {
+      names.push(agent.name)
+    }
+    const escaped = names.map(escapeRegex)
+    const pattern = new RegExp(`@(?:${escaped.join('|')})\\s+subagent`, 'i')
+    agentRegexMap.set(agent.filename, pattern)
+
+    agent.usage = {
+      sessionCount: 0,
+      totalTokens: 0,
+      inputTokens: 0,
+      outputTokens: 0,
+      reasoningTokens: 0,
+      cacheTokens: 0,
+      totalCost: 0,
+      lastUsed: null,
+    }
+  }
+
+  for (const session of sessions) {
+    const title = session.title ?? ''
+    for (const agent of agents) {
+      const regex = agentRegexMap.get(agent.filename)
+      if (regex && regex.test(title)) {
+        const u = agent.usage
+        u.sessionCount++
+        u.inputTokens += session.input_tokens ?? 0
+        u.outputTokens += session.output_tokens ?? 0
+        u.reasoningTokens += session.reasoning_tokens ?? 0
+        u.cacheTokens += session.cache_tokens ?? 0
+        u.totalTokens += session.total_tokens ?? 0
+        u.totalCost += session.cost ?? 0
+        const sessionDate = session.created_at ? new Date(session.created_at) : null
+        if (sessionDate && !isNaN(sessionDate.getTime())) {
+          if (!u.lastUsed || sessionDate > new Date(u.lastUsed)) {
+            u.lastUsed = session.created_at
+          }
         }
-        if (inCodeBlock) continue
-        if (line.trim().startsWith('#')) continue
-        if (line.trim() === '') continue
-        description = line.trim()
-        break
+        break // A session title should match at most one agent
       }
-      agents.push({ name, description, filename: file.name })
     }
   }
 
@@ -726,13 +789,15 @@ async function main() {
 
   ensureDir(DATA_DIR)
 
+  let dbData = null
+
   // Export database
   if (paths.local) {
     const dbPath = path.join(paths.local, 'opencode.db')
     if (fs.existsSync(dbPath)) {
       console.log('Reading opencode.db…')
       try {
-        const dbData = await exportDatabase(dbPath)
+        dbData = await exportDatabase(dbPath)
         fs.writeFileSync(path.join(DATA_DIR, 'sessions.json'), JSON.stringify(dbData.sessions))
         fs.writeFileSync(path.join(DATA_DIR, 'projects.json'), JSON.stringify(dbData.projects))
         fs.writeFileSync(path.join(DATA_DIR, 'messages.json'), JSON.stringify(dbData.messages))
@@ -750,7 +815,7 @@ async function main() {
 
   // Export JSON files
   console.log('Exporting auxiliary data…')
-  const auxData = exportJsonFiles(paths)
+  const auxData = exportJsonFiles(paths, dbData?.sessions ?? [])
   fs.writeFileSync(path.join(DATA_DIR, 'providers.json'), JSON.stringify(auxData.providers))
   fs.writeFileSync(path.join(DATA_DIR, 'models.json'), JSON.stringify(auxData.models))
   fs.writeFileSync(path.join(DATA_DIR, 'agents.json'), JSON.stringify(auxData.agents))

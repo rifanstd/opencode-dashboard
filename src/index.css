@@ -274,3 +274,126 @@ progress::-moz-progress-bar {
   overflow-wrap: break-word;
   word-break: break-word;
 }
+
+.agent-card:hover .agent-card-hint {
+  opacity: 1;
+}
+
+/* Markdown preview styles for agent prompt */
+.markdown-preview {
+  color: var(--text-primary);
+}
+
+.markdown-preview h1,
+.markdown-preview h2,
+.markdown-preview h3,
+.markdown-preview h4,
+.markdown-preview h5,
+.markdown-preview h6 {
+  font-family: var(--sans);
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-top: 16px;
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.markdown-preview h1 {
+  font-size: 18px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 8px;
+}
+
+.markdown-preview h2 {
+  font-size: 16px;
+}
+
+.markdown-preview h3 {
+  font-size: 14px;
+}
+
+.markdown-preview p {
+  margin-bottom: 12px;
+  color: var(--text-secondary);
+}
+
+.markdown-preview ul,
+.markdown-preview ol {
+  margin-bottom: 12px;
+  padding-left: 24px;
+}
+
+.markdown-preview li {
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+}
+
+.markdown-preview code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: var(--accent);
+}
+
+.markdown-preview pre {
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 16px;
+  overflow-x: auto;
+  margin-bottom: 12px;
+}
+
+.markdown-preview pre code {
+  background: transparent;
+  padding: 0;
+  color: var(--text-primary);
+}
+
+.markdown-preview blockquote {
+  border-left: 3px solid var(--accent);
+  margin-left: 0;
+  padding-left: 16px;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.markdown-preview hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+.markdown-preview a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.markdown-preview a:hover {
+  text-decoration: underline;
+}
+
+.markdown-preview table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 12px;
+}
+
+.markdown-preview th,
+.markdown-preview td {
+  border: 1px solid var(--border);
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.markdown-preview th {
+  background: var(--bg-tertiary);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.markdown-preview td {
+  color: var(--text-secondary);
+}

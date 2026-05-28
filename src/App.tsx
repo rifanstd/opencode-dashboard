@@ -11,6 +11,7 @@ import SessionsList from './pages/SessionsList.tsx'
 import SessionDetail from './pages/SessionDetail.tsx'
 import Resources from './pages/Resources.tsx'
 import Agents from './pages/Agents.tsx'
+import AgentDetail from './pages/AgentDetail.tsx'
 import Skills from './pages/Skills.tsx'
 
 function AppRoutes() {
@@ -37,6 +38,7 @@ function AppRoutes() {
           <Route path="/providers" element={<Resources />} />
           <Route path="/models" element={<Resources />} />
           <Route path="/agents" element={<Agents />} />
+          <Route path="/agents/:filename" element={<AgentDetail />} />
           <Route path="/skills" element={<Skills />} />
         </Routes>
       </motion.div>

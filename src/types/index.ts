@@ -65,10 +65,33 @@ export interface ProviderInfo {
   configured: boolean
 }
 
+export interface AgentPermissions {
+  edit: string | Record<string, string> | null
+  bash: string | Record<string, string> | null
+  glob: string | Record<string, string> | null
+}
+
+export interface AgentUsage {
+  sessionCount: number
+  totalTokens: number
+  inputTokens: number
+  outputTokens: number
+  reasoningTokens: number
+  cacheTokens: number
+  totalCost: number
+  lastUsed: string | null
+}
+
 export interface AgentInfo {
   name: string
   description: string
   filename: string
+  mode: 'primary' | 'subagent' | null
+  hidden: boolean
+  temperature: number | null
+  permissions: AgentPermissions
+  usage: AgentUsage
+  content: string
 }
 
 export interface SkillInfo {
