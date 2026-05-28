@@ -4,6 +4,14 @@ A client-side dashboard for visualizing your [opencode](https://github.com/openc
 
 > **All data is local.** No backend server. No cloud upload. Your data stays on your machine.
 
+<p align="center">
+  <img src="./docs/screenshots/overview-1.png" alt="Overview Dashboard" width="100%"/>
+</p>
+
+<p align="center">
+  <img src="./docs/screenshots/overview-2.png" alt="Token Usage and Analytics" width="100%"/>
+</p>
+
 ---
 
 ## Features
