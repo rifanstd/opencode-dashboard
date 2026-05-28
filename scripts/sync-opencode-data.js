@@ -749,12 +749,10 @@ function exportJsonFiles(paths) {
 
   // 4. Build final skills array in UI-compatible shape
   for (const [name, data] of skillMap) {
-    const lockSource = lockFileSources.get(name)
-    const derivedSource = lockSource ?? data.sourceLabel ?? '—'
     skills.push({
       name,
-      version: '—',
-      source: derivedSource,
+      description: data.description || '',
+      path: path.dirname(data.skillPath),
     })
   }
 

@@ -1,16 +1,18 @@
-import { useEffect, useState } from 'react'
-import { Wrench } from 'lucide-react'
+import { useEffect, useState, useMemo } from 'react'
+import { Search } from 'lucide-react'
 import { loadSkills } from '../utils/dataLoader.ts'
+import DataTable from '../components/DataTable.tsx'
 import ErrorMessage from '../components/ErrorMessage.tsx'
 
 export default function Skills() {
   const [skills, setSkills] = useState<Array<{
     name: string
-    version: string
-    source: string
+    description: string
+    path: string
   }>>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     async function fetch() {
@@ -27,6 +29,15 @@ export default function Skills() {
     }
     fetch()
   }, [])
+
+  const filteredSkills = useMemo(() => {
+    if (!search) return skills
+    const q = search.toLowerCase()
+    return skills.filter((s) =>
+      s.name.toLowerCase().includes(q) ||
+      s.description.toLowerCase().includes(q)
+    )
+  }, [skills, search])
 
   if (loading) {
     return (
@@ -55,57 +66,48 @@ export default function Skills() {
           No skills found.
         </div>
       )}
-      <div style={{ display: 'flex', flexDirection: 'column' }}>
-        {skills.map((s) => (
-          <div
-            key={s.name}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              padding: '12px 16px',
-              borderBottom: '1px solid var(--border)',
-              transition: 'background 100ms',
-            }}
-            onMouseEnter={(e) => { e.currentTarget.style.background = 'rgba(88,166,255,0.04)' }}
-            onMouseLeave={(e) => { e.currentTarget.style.background = 'transparent' }}
-          >
-            <Wrench size={16} style={{ color: 'var(--text-muted)', marginRight: 12, flexShrink: 0 }} />
-            <span
-              style={{
-                fontFamily: 'var(--sans)',
-                fontSize: 14,
-                fontWeight: 500,
-                color: 'var(--text-primary)',
-                flex: 1,
-              }}
-            >
-              {s.name}
-            </span>
-            <span
-              style={{
-                fontFamily: 'var(--mono)',
-                fontSize: 12,
-                color: 'var(--text-muted)',
-                marginLeft: 12,
-                flexShrink: 0,
-              }}
-            >
-              v{s.version}
-            </span>
-            <span
-              style={{
-                fontFamily: 'var(--sans)',
-                fontSize: 12,
-                color: 'var(--text-muted)',
-                marginLeft: 16,
-                flexShrink: 0,
-              }}
-            >
-              {s.source}
-            </span>
+      {skills.length > 0 && (
+        <>
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <Search size={14} style={{ position: 'absolute', left: 8, color: 'var(--text-muted)', pointerEvents: 'none' }} />
+              <input
+                type="text"
+                placeholder="Search…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                style={{
+                  fontFamily: 'var(--sans)',
+                  fontSize: 13,
+                  height: 32,
+                  padding: '0 10px 0 28px',
+                  borderRadius: 4,
+                  border: '1px solid var(--border)',
+                  background: 'var(--bg-tertiary)',
+                  color: 'var(--text-primary)',
+                  outline: 'none',
+                  minWidth: 200,
+                }}
+              />
+            </div>
           </div>
-        ))}
-      </div>
+          {filteredSkills.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: 40, fontFamily: 'var(--sans)', fontSize: 13, color: 'var(--text-muted)' }}>
+              No skills found.
+            </div>
+          ) : (
+            <DataTable
+              columns={[
+                { key: 'name', header: 'Name', width: '200px' },
+                { key: 'description', header: 'Description' },
+                { key: 'path', header: 'Path' },
+              ]}
+              data={filteredSkills}
+              keyExtractor={(row) => row.name}
+            />
+          )}
+        </>
+      )}
     </div>
   )
 }

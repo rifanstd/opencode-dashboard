@@ -73,8 +73,8 @@ export interface AgentInfo {
 
 export interface SkillInfo {
   name: string
-  version: string
-  source: string
+  description: string
+  path: string
 }
 
 export interface LogEntry {
