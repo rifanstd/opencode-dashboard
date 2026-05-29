@@ -42,3 +42,6 @@ auth.json
 .knowledge/
 prompt.md
 skills-lock.json
+
+# local
+start_dev.bat
